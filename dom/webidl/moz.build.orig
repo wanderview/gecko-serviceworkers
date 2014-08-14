@@ -310,7 +310,6 @@ WEBIDL_FILES = [
     'Request.webidl',
     'ResourceStats.webidl',
     'ResourceStatsManager.webidl',
-    'Response.webidl',
     'RGBColor.webidl',
     'RTCConfiguration.webidl',
     'RTCIceCandidate.webidl',
