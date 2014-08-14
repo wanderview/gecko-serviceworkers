@@ -50,6 +50,8 @@ WEBIDL_FILES = [
     'BiquadFilterNode.webidl',
     'Blob.webidl',
     'BrowserElementDictionaries.webidl',
+    'Cache.webidl',
+    'CacheStorage.webidl',
     'CallsList.webidl',
     'CameraCapabilities.webidl',
     'CameraControl.webidl',

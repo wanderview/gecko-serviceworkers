@@ -3,6 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 include protocol PBackgroundTest;
+include protocol PCacheStorage;
+include protocol PCache;
 
 namespace mozilla {
 namespace ipc {
@@ -10,10 +12,15 @@ namespace ipc {
 protocol PBackground
 {
   manages PBackgroundTest;
+  manages PCacheStorage;
+  manages PCache;
 
 parent:
   // Only called at startup during mochitests to check the basic infrastructure.
   PBackgroundTest(nsCString testArg);
+
+  PCacheStorage(nsCString origin);
+  PCache();
 };
 
 } // namespace ipc

@@ -212,6 +212,7 @@
 #include "TimeChangeObserver.h"
 #include "mozilla/dom/AudioContext.h"
 #include "mozilla/dom/BrowserElementDictionariesBinding.h"
+#include "mozilla/dom/CacheStorage.h"
 #include "mozilla/dom/Console.h"
 #include "mozilla/dom/FunctionBinding.h"
 #include "mozilla/dom/HashChangeEvent.h"
@@ -1772,6 +1773,8 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mGamepads)
 #endif
 
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCacheStorage)
+
   // Traverse stuff from nsPIDOMWindow
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mChromeEventHandler)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mParentTarget)
@@ -1831,6 +1834,8 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsGlobalWindow)
 #ifdef MOZ_GAMEPAD
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mGamepads)
 #endif
+
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mCacheStorage)
 
   // Unlink stuff from nsPIDOMWindow
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mChromeEventHandler)
@@ -10744,6 +10749,22 @@ nsGlobalWindow::GetInterface(JSContext* aCx, nsIJSID* aIID,
                              ErrorResult& aError)
 {
   dom::GetInterface(aCx, this, aIID, aRetval, aError);
+}
+
+already_AddRefed<CacheStorage>
+nsGlobalWindow::Caches()
+{
+  if (!mCacheStorage) {
+    nsAutoCString origin;
+    nsCOMPtr<nsIPrincipal> principal = GetPrincipal();
+    if (!principal || NS_FAILED(principal->GetOrigin(getter_Copies(origin)))) {
+      origin.AssignLiteral("null");
+    }
+    mCacheStorage = new CacheStorage(ToSupports(this), origin);
+  }
+
+  nsRefPtr<CacheStorage> ref = mCacheStorage;
+  return ref.forget();
 }
 
 void

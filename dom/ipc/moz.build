@@ -79,6 +79,8 @@ IPDL_SOURCES += [
     'PBlob.ipdl',
     'PBlobStream.ipdl',
     'PBrowser.ipdl',
+    'PCache.ipdl',
+    'PCacheStorage.ipdl',
     'PColorPicker.ipdl',
     'PContent.ipdl',
     'PContentBridge.ipdl',

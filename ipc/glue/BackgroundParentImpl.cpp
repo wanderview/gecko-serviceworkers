@@ -7,11 +7,15 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/ipc/BackgroundParent.h"
 #include "mozilla/ipc/PBackgroundTestParent.h"
+#include "mozilla/dom/PCacheStorageParent.h"
+#include "mozilla/dom/PCacheParent.h"
 #include "nsThreadUtils.h"
 #include "nsTraceRefcnt.h"
 #include "nsXULAppAPI.h"
 
 using mozilla::ipc::AssertIsOnBackgroundThread;
+using mozilla::dom::PCacheStorageParent;
+using mozilla::dom::PCacheParent;
 
 namespace {
 
@@ -106,6 +110,49 @@ BackgroundParentImpl::DeallocPBackgroundTestParent(
 
   delete static_cast<TestParent*>(aActor);
   return true;
+}
+
+PCacheStorageParent*
+BackgroundParentImpl::AllocPCacheStorageParent(const nsCString& aOrigin)
+{
+  MOZ_CRASH("not implemented");
+  return nullptr;
+}
+
+bool
+BackgroundParentImpl::RecvPCacheStorageConstructor(PCacheStorageParent* aActor,
+                                                   const nsCString& aOrigin)
+{
+  MOZ_CRASH("not implemented");
+  return false;
+}
+
+bool
+BackgroundParentImpl::DeallocPCacheStorageParent(PCacheStorageParent* aActor)
+{
+  MOZ_CRASH("not implemented");
+  return false;
+}
+
+PCacheParent*
+BackgroundParentImpl::AllocPCacheParent()
+{
+  MOZ_CRASH("not implemented");
+  return nullptr;
+}
+
+bool
+BackgroundParentImpl::RecvPCacheConstructor(PCacheParent* aActor)
+{
+  MOZ_CRASH("not implemented");
+  return false;
+}
+
+bool
+BackgroundParentImpl::DeallocPCacheParent(PCacheParent* aActor)
+{
+  MOZ_CRASH("not implemented");
+  return false;
 }
 
 } // namespace ipc

@@ -4,8 +4,13 @@
 
 #include "BackgroundChildImpl.h"
 
+#include "mozilla/dom/PCacheStorageChild.h"
+#include "mozilla/dom/PCacheChild.h"
 #include "mozilla/ipc/PBackgroundTestChild.h"
 #include "nsTraceRefcnt.h"
+
+using mozilla::dom::PCacheStorageChild;
+using mozilla::dom::PCacheChild;
 
 namespace {
 
@@ -90,6 +95,34 @@ BackgroundChildImpl::DeallocPBackgroundTestChild(PBackgroundTestChild* aActor)
 
   delete static_cast<TestChild*>(aActor);
   return true;
+}
+
+PCacheStorageChild*
+BackgroundChildImpl::AllocPCacheStorageChild(const nsCString& aOrigin)
+{
+  MOZ_CRASH("not implemented");
+  return nullptr;
+}
+
+bool
+BackgroundChildImpl::DeallocPCacheStorageChild(PCacheStorageChild* aActor)
+{
+  MOZ_CRASH("not implemented");
+  return false;
+}
+
+PCacheChild*
+BackgroundChildImpl::AllocPCacheChild()
+{
+  MOZ_CRASH("not implemented");
+  return nullptr;
+}
+
+bool
+BackgroundChildImpl::DeallocPCacheChild(PCacheChild* aActor)
+{
+  MOZ_CRASH("not implemented");
+  return false;
 }
 
 } // namespace ipc

@@ -108,6 +108,7 @@ namespace mozilla {
 class DOMEventTargetHelper;
 namespace dom {
 class BarProp;
+class CacheStorage;
 class Console;
 class External;
 class Function;
@@ -1056,6 +1057,8 @@ public:
                     JS::MutableHandle<JS::Value> aRetval,
                     mozilla::ErrorResult& aError);
 
+  already_AddRefed<mozilla::dom::CacheStorage> Caches();
+
 protected:
   // Array of idle observers that are notified of idle events.
   nsTObserverArray<IdleObserverHolder> mIdleObservers;
@@ -1630,6 +1633,8 @@ protected:
   // mSpeechSynthesis is only used on inner windows.
   nsRefPtr<mozilla::dom::SpeechSynthesis> mSpeechSynthesis;
 #endif
+
+  nsRefPtr<mozilla::dom::CacheStorage> mCacheStorage;
 
   friend class nsDOMScriptableHelper;
   friend class nsDOMWindowUtils;

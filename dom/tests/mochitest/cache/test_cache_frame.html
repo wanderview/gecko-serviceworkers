@@ -1,0 +1,23 @@
+<!--
+  Any copyright is dedicated to the Public Domain.
+  http://creativecommons.org/publicdomain/zero/1.0/
+-->
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Test for SharedWorker</title>
+</head>
+<body>
+<script type="text/javascript">
+  "use strict";
+  addEventListener("message", function(evt) {
+    var success = true;
+    success = success && !!caches;
+    parent.postMessage({
+      type: "result",
+      success: success
+    }, "*");
+  });
+</script>
+</body>
+</html>

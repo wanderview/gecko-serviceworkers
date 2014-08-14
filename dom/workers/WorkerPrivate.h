@@ -1043,6 +1043,13 @@ public:
   }
 
   bool
+  DOMCachesEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_DOM_CACHES];
+  }
+
+  bool
   OnLine() const
   {
     AssertIsOnWorkerThread();

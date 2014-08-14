@@ -44,4 +44,7 @@ partial interface WorkerGlobalScope {
   attribute EventHandler onclose;
 
   void dump(optional DOMString str);
+
+  [Func="mozilla::dom::CacheStorage::PrefEnabled"]
+  readonly attribute CacheStorage caches;
 };
