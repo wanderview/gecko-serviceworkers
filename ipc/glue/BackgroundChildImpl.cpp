@@ -4,11 +4,12 @@
 
 #include "BackgroundChildImpl.h"
 
-#include "mozilla/dom/PCacheStorageChild.h"
+#include "mozilla/dom/CacheStorageChild.h"
 #include "mozilla/dom/PCacheChild.h"
 #include "mozilla/ipc/PBackgroundTestChild.h"
 #include "nsTraceRefcnt.h"
 
+using mozilla::dom::CacheStorageChild;
 using mozilla::dom::PCacheStorageChild;
 using mozilla::dom::PCacheChild;
 
@@ -100,15 +101,17 @@ BackgroundChildImpl::DeallocPBackgroundTestChild(PBackgroundTestChild* aActor)
 PCacheStorageChild*
 BackgroundChildImpl::AllocPCacheStorageChild(const nsCString& aOrigin)
 {
-  MOZ_CRASH("not implemented");
+  MOZ_CRASH("CacheStorageChild actor must be provided to PBackground manager");
   return nullptr;
 }
 
 bool
 BackgroundChildImpl::DeallocPCacheStorageChild(PCacheStorageChild* aActor)
 {
-  MOZ_CRASH("not implemented");
-  return false;
+  // The CacheStorageChild actor is provided to the PBackground manager, but
+  // we own the object and must delete it.
+  delete aActor;
+  return true;
 }
 
 PCacheChild*

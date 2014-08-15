@@ -13,21 +13,25 @@
 <script class="testbody" type="text/javascript">
 SimpleTest.waitForExplicitFinish();
 SpecialPowers.setBoolPref("dom.window-caches.enabled", true);
-var frame = document.getElementById("frame");
-frame.src = "test_cache_frame.html";
-frame.onload = function() {
-  frame = frame.contentWindow;
+SpecialPowers.pushPrefEnv({
+  "set": [["dom.window-caches.enabled", true]]
+}, function() {
+  var frame = document.getElementById("frame");
+  frame.src = "test_cache_frame.html";
+  frame.onload = function() {
+    frame = frame.contentWindow;
 
-  addEventListener("message", function(evt) {
-    ok(evt.data.success, "frame should have succeeded");
-    SpecialPowers.setBoolPref("dom.worker-caches.enabled", true);
-    workerTestExec("test_cache.js");
-  });
+    addEventListener("message", function(evt) {
+      ok(evt.data.success, "frame should have succeeded");
+      SpecialPowers.setBoolPref("dom.worker-caches.enabled", true);
+      workerTestExec("test_cache.js");
+    });
 
-  frame.postMessage({
-    type: "start"
-  }, "*");
-}
+    frame.postMessage({
+      type: "start"
+    }, "*");
+  }
+});
 </script>
 </body>
 </html>

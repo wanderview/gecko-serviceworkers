@@ -7,19 +7,28 @@
 #ifndef mozilla_dom_CacheStorage_h
 #define mozilla_dom_CacheStorage_h
 
+#include "mozilla/dom/ActorDestroyListener.h"
 #include "nsISupportsImpl.h"
 #include "nsWrapperCache.h"
+#include "nsIIPCBackgroundChildCreateCallback.h"
 
 namespace mozilla {
+namespace ipc {
+  class IProtocol;
+}
 namespace dom {
 
+class CacheStorageChild;
 class Promise;
 class QueryParams;
 class RequestOrScalarValueString;
 
-class CacheStorage MOZ_FINAL : public nsISupports
+class CacheStorage MOZ_FINAL : public nsIIPCBackgroundChildCreateCallback
                              , public nsWrapperCache
+                             , public ActorDestroyListener
 {
+  typedef mozilla::ipc::PBackgroundChild PBackgroundChild;
+
 public:
   explicit CacheStorage(nsISupports* aOwner, const nsACString& aOrigin);
 
@@ -44,8 +53,13 @@ public:
 private:
   virtual ~CacheStorage();
 
+  virtual void ActorCreated(PBackgroundChild* aActor) MOZ_OVERRIDE;
+  virtual void ActorFailed() MOZ_OVERRIDE;
+  virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
+
   nsCOMPtr<nsISupports> mOwner;
   const nsCString mOrigin;
+  CacheStorageChild* mActor;
 };
 
 } // namespace dom

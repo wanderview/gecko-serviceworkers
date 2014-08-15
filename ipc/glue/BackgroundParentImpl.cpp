@@ -7,7 +7,7 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/ipc/BackgroundParent.h"
 #include "mozilla/ipc/PBackgroundTestParent.h"
-#include "mozilla/dom/PCacheStorageParent.h"
+#include "mozilla/dom/CacheStorageParent.h"
 #include "mozilla/dom/PCacheParent.h"
 #include "nsThreadUtils.h"
 #include "nsTraceRefcnt.h"
@@ -115,23 +115,14 @@ BackgroundParentImpl::DeallocPBackgroundTestParent(
 PCacheStorageParent*
 BackgroundParentImpl::AllocPCacheStorageParent(const nsCString& aOrigin)
 {
-  MOZ_CRASH("not implemented");
-  return nullptr;
-}
-
-bool
-BackgroundParentImpl::RecvPCacheStorageConstructor(PCacheStorageParent* aActor,
-                                                   const nsCString& aOrigin)
-{
-  MOZ_CRASH("not implemented");
-  return false;
+  return new mozilla::dom::CacheStorageParent(aOrigin);
 }
 
 bool
 BackgroundParentImpl::DeallocPCacheStorageParent(PCacheStorageParent* aActor)
 {
-  MOZ_CRASH("not implemented");
-  return false;
+  delete aActor;
+  return true;
 }
 
 PCacheParent*
@@ -139,13 +130,6 @@ BackgroundParentImpl::AllocPCacheParent()
 {
   MOZ_CRASH("not implemented");
   return nullptr;
-}
-
-bool
-BackgroundParentImpl::RecvPCacheConstructor(PCacheParent* aActor)
-{
-  MOZ_CRASH("not implemented");
-  return false;
 }
 
 bool

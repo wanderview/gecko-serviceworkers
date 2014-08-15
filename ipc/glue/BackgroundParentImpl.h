@@ -40,17 +40,10 @@ protected:
   AllocPCacheStorageParent(const nsCString& aOrigin) MOZ_OVERRIDE;
 
   virtual bool
-  RecvPCacheStorageConstructor(mozilla::dom::PCacheStorageParent* aActor,
-                               const nsCString& aOrigin) MOZ_OVERRIDE;
-
-  virtual bool
   DeallocPCacheStorageParent(mozilla::dom::PCacheStorageParent* aActor) MOZ_OVERRIDE;
 
   virtual mozilla::dom::PCacheParent*
   AllocPCacheParent() MOZ_OVERRIDE;
-
-  virtual bool
-  RecvPCacheConstructor(mozilla::dom::PCacheParent* aActor) MOZ_OVERRIDE;
 
   virtual bool
   DeallocPCacheParent(mozilla::dom::PCacheParent* aActor) MOZ_OVERRIDE;

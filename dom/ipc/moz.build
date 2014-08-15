@@ -14,6 +14,9 @@ EXPORTS.mozilla.dom.ipc += [
 ]
 
 EXPORTS.mozilla.dom += [
+    'ActorDestroyListener.h',
+    'CacheStorageChild.h',
+    'CacheStorageParent.h',
     'ContentBridgeChild.h',
     'ContentBridgeParent.h',
     'ContentChild.h',
@@ -42,6 +45,8 @@ EXPORTS.mozilla += [
 
 UNIFIED_SOURCES += [
     'AppProcessChecker.cpp',
+    'CacheStorageChild.cpp',
+    'CacheStorageParent.cpp',
     'ColorPickerParent.cpp',
     'ContentBridgeChild.cpp',
     'ContentBridgeParent.cpp',
