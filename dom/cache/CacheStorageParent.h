@@ -9,15 +9,21 @@
 
 #include "mozilla/dom/PCacheStorageParent.h"
 
+template <class T> class nsRefPtr;
+
 namespace mozilla {
 namespace dom {
+
+class CacheManager;
 
 class CacheStorageParent MOZ_FINAL : public PCacheStorageParent
 {
 public:
-  CacheStorageParent(const nsACString& aActor);
+  CacheStorageParent(const nsACString& aOrigin);
   virtual ~CacheStorageParent();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
+private:
+  nsRefPtr<CacheManager> mManager;
 };
 
 } // namespace dom

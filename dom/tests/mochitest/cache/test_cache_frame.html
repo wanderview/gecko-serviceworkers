@@ -10,7 +10,8 @@
 <body>
 <script type="text/javascript">
   "use strict";
-  addEventListener("message", function(evt) {
+  addEventListener("message", function messageListener(evt) {
+    removeEventListener("message", messageListener);
     var success = true;
     success = success && !!caches;
     parent.postMessage({

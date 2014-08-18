@@ -6,12 +6,27 @@
 
 EXPORTS.mozilla.dom += [
     'Cache.h',
+    'CacheChild.h',
+    'CacheManager.h',
+    'CacheParent.h',
     'CacheStorage.h',
+    'CacheStorageChild.h',
+    'CacheStorageParent.h',
 ]
 
 UNIFIED_SOURCES += [
     'Cache.cpp',
+    'CacheChild.cpp',
+    'CacheManager.cpp',
+    'CacheParent.cpp',
     'CacheStorage.cpp',
+    'CacheStorageChild.cpp',
+    'CacheStorageParent.cpp',
+]
+
+IPDL_SOURCES += [
+    'PCache.ipdl',
+    'PCacheStorage.ipdl',
 ]
 
 include('/ipc/chromium/chromium-config.mozbuild')

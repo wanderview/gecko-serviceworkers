@@ -6,24 +6,21 @@
 
 #include "mozilla/dom/CacheStorageParent.h"
 
+#include "mozilla/dom/CacheManager.h"
+#include "nsCOMPtr.h"
+
 using mozilla::dom::CacheStorageParent;
 
-CacheStorageParent::CacheStorageParent(const nsACString& aActor)
+CacheStorageParent::CacheStorageParent(const nsACString& aOrigin)
+  : mManager(CacheManager::GetInstance())
 {
-  // TODO: implement
-  printf_stderr("### ### CacheStorageParent::CacheStorageParent(%s)\n",
-                aActor.BeginReading());
 }
 
 CacheStorageParent::~CacheStorageParent()
 {
-  // TODO: implement
-  printf_stderr("### ### CacheStorageParent::~CacheStorageParent()\n");
 }
 
 void
 CacheStorageParent::ActorDestroy(ActorDestroyReason aReason)
 {
-  // TODO: implement
-  printf_stderr("### ### CacheStorageParent::ActorDestroy()\n");
 }

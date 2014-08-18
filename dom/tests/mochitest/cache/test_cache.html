@@ -19,15 +19,19 @@ SpecialPowers.pushPrefEnv({
   var frame = document.getElementById("frame");
   frame.src = "test_cache_frame.html";
   frame.onload = function() {
-    frame = frame.contentWindow;
+    var contentWindow = frame.contentWindow;
 
     addEventListener("message", function(evt) {
       ok(evt.data.success, "frame should have succeeded");
+      frame.src = "about:blank";
+      frame.parentNode.removeChild(frame);
+      frame = null;
+
       SpecialPowers.setBoolPref("dom.worker-caches.enabled", true);
       workerTestExec("test_cache.js");
     });
 
-    frame.postMessage({
+    contentWindow.postMessage({
       type: "start"
     }, "*");
   }

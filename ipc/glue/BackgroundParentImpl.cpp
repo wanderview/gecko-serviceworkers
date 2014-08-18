@@ -7,14 +7,16 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/ipc/BackgroundParent.h"
 #include "mozilla/ipc/PBackgroundTestParent.h"
+#include "mozilla/dom/CacheParent.h"
 #include "mozilla/dom/CacheStorageParent.h"
-#include "mozilla/dom/PCacheParent.h"
 #include "nsThreadUtils.h"
 #include "nsTraceRefcnt.h"
 #include "nsXULAppAPI.h"
 
 using mozilla::ipc::AssertIsOnBackgroundThread;
+using mozilla::dom::CacheStorageParent;
 using mozilla::dom::PCacheStorageParent;
+using mozilla::dom::CacheParent;
 using mozilla::dom::PCacheParent;
 
 namespace {
@@ -115,7 +117,7 @@ BackgroundParentImpl::DeallocPBackgroundTestParent(
 PCacheStorageParent*
 BackgroundParentImpl::AllocPCacheStorageParent(const nsCString& aOrigin)
 {
-  return new mozilla::dom::CacheStorageParent(aOrigin);
+  return new CacheStorageParent(aOrigin);
 }
 
 bool
@@ -128,15 +130,14 @@ BackgroundParentImpl::DeallocPCacheStorageParent(PCacheStorageParent* aActor)
 PCacheParent*
 BackgroundParentImpl::AllocPCacheParent()
 {
-  MOZ_CRASH("not implemented");
-  return nullptr;
+  return new CacheParent();
 }
 
 bool
 BackgroundParentImpl::DeallocPCacheParent(PCacheParent* aActor)
 {
-  MOZ_CRASH("not implemented");
-  return false;
+  delete aActor;
+  return true;
 }
 
 } // namespace ipc
