@@ -12,6 +12,7 @@ namespace mozilla {
 namespace dom {
 
 CacheChild::CacheChild()
+  : mListener(nullptr)
 {
 }
 

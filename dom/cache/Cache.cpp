@@ -29,6 +29,7 @@ Cache::Cache(nsISupports* aOwner, PCacheChild* aActor)
 {
   MOZ_ASSERT(mActor);
   SetIsDOMBinding();
+  mActor->SetListener(*this);
 }
 
 already_AddRefed<Promise>
