@@ -21,8 +21,17 @@ public:
   CacheStorageChild(CacheStorageChildListener& aListener);
   virtual ~CacheStorageChild();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
-  virtual bool RecvCreateResponse(const uint64_t& aRequestId,
+  virtual bool RecvGetResponse(const uintptr_t& aRequestId,
+                               PCacheChild* aActor) MOZ_OVERRIDE;
+  virtual bool RecvHasResponse(const uintptr_t& aRequestId,
+                               const bool& aResult) MOZ_OVERRIDE;
+  virtual bool RecvCreateResponse(const uintptr_t& aRequestId,
                                   PCacheChild* aActor) MOZ_OVERRIDE;
+  virtual bool RecvDeleteResponse(const uintptr_t& aRequestId,
+                                  const bool& aResult) MOZ_OVERRIDE;
+  virtual bool RecvKeysResponse(const uintptr_t& aRequestId,
+                                const nsTArray<nsString>& aKeys) MOZ_OVERRIDE;
+
   void ClearListener();
 private:
   CacheStorageChildListener* mListener;

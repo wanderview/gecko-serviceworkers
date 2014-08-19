@@ -60,21 +60,49 @@ CacheStorage::CacheStorage(nsISupports* aOwner, nsIGlobalObject* aGlobal,
 
 already_AddRefed<Promise>
 CacheStorage::Match(const RequestOrScalarValueString& aRequest,
-                    const QueryParams& aParams)
+                    const QueryParams& aParams, ErrorResult& aRv)
 {
   MOZ_CRASH("not implemented");
 }
 
 already_AddRefed<Promise>
-CacheStorage::Get(const nsAString& aKey)
+CacheStorage::Get(const nsAString& aKey, ErrorResult& aRv)
 {
-  MOZ_CRASH("not implemented");
+  MOZ_ASSERT(mActor);
+
+  nsRefPtr<Promise> promise = Promise::Create(mGlobal, aRv);
+  if (!promise) {
+    return nullptr;
+  }
+
+  RequestId requestId = AddRequestPromise(promise, aRv);
+  if (requestId == INVALID_REQUEST_ID) {
+    return nullptr;
+  }
+
+  unused << mActor->SendGet(requestId, nsString(aKey));
+
+  return promise.forget();
 }
 
 already_AddRefed<Promise>
-CacheStorage::Has(const nsAString& aKey)
+CacheStorage::Has(const nsAString& aKey, ErrorResult& aRv)
 {
-  MOZ_CRASH("not implemented");
+  MOZ_ASSERT(mActor);
+
+  nsRefPtr<Promise> promise = Promise::Create(mGlobal, aRv);
+  if (!promise) {
+    return nullptr;
+  }
+
+  RequestId requestId = AddRequestPromise(promise, aRv);
+  if (requestId == INVALID_REQUEST_ID) {
+    return nullptr;
+  }
+
+  unused << mActor->SendHas(requestId, nsString(aKey));
+
+  return promise.forget();
 }
 
 already_AddRefed<Promise>
@@ -98,15 +126,43 @@ CacheStorage::Create(const nsAString& aKey, ErrorResult& aRv)
 }
 
 already_AddRefed<Promise>
-CacheStorage::Delete(const nsAString& aKey)
+CacheStorage::Delete(const nsAString& aKey, ErrorResult& aRv)
 {
-  MOZ_CRASH("not implemented");
+  MOZ_ASSERT(mActor);
+
+  nsRefPtr<Promise> promise = Promise::Create(mGlobal, aRv);
+  if (!promise) {
+    return nullptr;
+  }
+
+  RequestId requestId = AddRequestPromise(promise, aRv);
+  if (requestId == INVALID_REQUEST_ID) {
+    return nullptr;
+  }
+
+  unused << mActor->SendDelete(requestId, nsString(aKey));
+
+  return promise.forget();
 }
 
 already_AddRefed<Promise>
-CacheStorage::Keys()
+CacheStorage::Keys(ErrorResult& aRv)
 {
-  MOZ_CRASH("not implemented");
+  MOZ_ASSERT(mActor);
+
+  nsRefPtr<Promise> promise = Promise::Create(mGlobal, aRv);
+  if (!promise) {
+    return nullptr;
+  }
+
+  RequestId requestId = AddRequestPromise(promise, aRv);
+  if (requestId == INVALID_REQUEST_ID) {
+    return nullptr;
+  }
+
+  unused << mActor->SendKeys(requestId);
+
+  return promise.forget();
 }
 
 // static
@@ -170,16 +226,74 @@ CacheStorage::ActorDestroy(IProtocol& aActor)
 }
 
 void
-CacheStorage::RecvCreateResponse(uint64_t aRequestId, PCacheChild* aActor)
+CacheStorage::RecvGetResponse(uint64_t aRequestId, PCacheChild* aActor)
 {
-  MOZ_ASSERT(aActor);
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
-    PCacheChild::Send__delete__(aActor);
+    if (aActor) {
+      PCacheChild::Send__delete__(aActor);
+    }
     return;
   }
+
+  if (!aActor) {
+    promise->MaybeResolve(JS::UndefinedHandleValue);
+    return;
+  }
+
   nsRefPtr<Cache> cache = new Cache(mOwner, aActor);
   promise->MaybeResolve(cache);
+}
+
+void
+CacheStorage::RecvHasResponse(uintptr_t aRequestId, bool aResult)
+{
+  nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
+  if (NS_WARN_IF(!promise)) {
+    return;
+  }
+  promise->MaybeResolve(aResult);
+}
+
+void
+CacheStorage::RecvCreateResponse(uint64_t aRequestId, PCacheChild* aActor)
+{
+  nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
+  if (NS_WARN_IF(!promise)) {
+    if (aActor) {
+      PCacheChild::Send__delete__(aActor);
+    }
+    return;
+  }
+
+  if (!aActor) {
+    promise->MaybeReject(NS_ERROR_DOM_INVALID_ACCESS_ERR);
+    return;
+  }
+
+  nsRefPtr<Cache> cache = new Cache(mOwner, aActor);
+  promise->MaybeResolve(cache);
+}
+
+void
+CacheStorage::RecvDeleteResponse(uintptr_t aRequestId, bool aResult)
+{
+  nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
+  if (NS_WARN_IF(!promise)) {
+    return;
+  }
+  promise->MaybeResolve(aResult);
+}
+
+void
+CacheStorage::RecvKeysResponse(const uintptr_t& aRequestId,
+                               const nsTArray<nsString>& aKeys)
+{
+  nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
+  if (NS_WARN_IF(!promise)) {
+    return;
+  }
+  promise->MaybeResolve(aKeys);
 }
 
 CacheStorage::~CacheStorage()

@@ -14,12 +14,29 @@
     removeEventListener("message", messageListener);
     var success = true;
     success = success && !!caches;
-    caches.create("foobar").then(function(cache) {
-      success = success && !!cache;
-      parent.postMessage({
-        type: "result",
-        success: success
-      }, "*");
+    caches.create("foobar").then(function(createCache) {
+      success = success && !!createCache;
+      caches.get("foobar").then(function(getCache) {
+        success = success && !!getCache;
+        caches.has("foobar").then(function(hasResult) {
+          success = success && hasResult;
+          caches.keys().then(function(keys) {
+            success = success && !!keys;
+            success = success && keys.length === 1;
+            success = success && keys.indexOf("foobar") === 0;
+            caches.delete("foobar").then(function(deleteResult) {
+              success = success && deleteResult;
+              caches.get("foobar").then(function(getMissingCache) {
+                success = success && getMissingCache === undefined;
+                parent.postMessage({
+                  type: "result",
+                  success: success
+                }, "*");
+              });
+            });
+          });
+        });
+      });
     });
   });
 </script>

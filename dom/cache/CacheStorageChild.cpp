@@ -31,11 +31,47 @@ CacheStorageChild::ActorDestroy(ActorDestroyReason aReason)
 }
 
 bool
-CacheStorageChild::RecvCreateResponse(const uint64_t& aRequestId,
+CacheStorageChild::RecvGetResponse(const uintptr_t& aRequestId,
+                                   PCacheChild* aActor)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvGetResponse(aRequestId, aActor);
+  return true;
+}
+
+bool
+CacheStorageChild::RecvHasResponse(const uintptr_t& aRequestId,
+                                   const bool& aResult)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvHasResponse(aRequestId, aResult);
+  return true;
+}
+
+bool
+CacheStorageChild::RecvCreateResponse(const uintptr_t& aRequestId,
                                       PCacheChild* aActor)
 {
   MOZ_ASSERT(mListener);
   mListener->RecvCreateResponse(aRequestId, aActor);
+  return true;
+}
+
+bool
+CacheStorageChild::RecvDeleteResponse(const uintptr_t& aRequestId,
+                                      const bool& aResult)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvDeleteResponse(aRequestId, aResult);
+  return true;
+}
+
+bool
+CacheStorageChild::RecvKeysResponse(const uintptr_t& aRequestId,
+                                    const nsTArray<nsString>& aKeys)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvKeysResponse(aRequestId, aKeys);
   return true;
 }
 

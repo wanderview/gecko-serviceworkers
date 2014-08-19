@@ -11,11 +11,11 @@
 [Exposed=(Window,Worker),
  Func="mozilla::dom::CacheStorage::PrefEnabled"]
 interface CacheStorage {
-   Promise<Response> match((Request or ScalarValueString) request,
-                           optional QueryParams params);
-   Promise<Cache> get(DOMString cacheName);
-   Promise<boolean> has(DOMString cacheName);
+   [Throws] Promise<Response> match((Request or ScalarValueString) request,
+                                    optional QueryParams params);
+   [Throws] Promise<Cache> get(DOMString cacheName);
+   [Throws] Promise<boolean> has(DOMString cacheName);
    [Throws] Promise<Cache> create(DOMString cacheName);
-   Promise<boolean> delete(DOMString cacheName);
-   Promise<sequence<DOMString>> keys();
+   [Throws] Promise<boolean> delete(DOMString cacheName);
+   [Throws] Promise<sequence<DOMString>> keys();
 };

@@ -28,10 +28,50 @@ CacheStorageParent::ActorDestroy(ActorDestroyReason aReason)
 }
 
 bool
-CacheStorageParent::RecvCreate(const uint64_t& aRequestId, const nsString& aKey)
+CacheStorageParent::RecvGet(const uintptr_t& aRequestId, const nsString& aKey)
 {
-  PCacheParent* actor = Manager()->SendPCacheConstructor();
-  printf_stderr("### ### CacheStorageParent::RecvCreate(%lu)\n", aRequestId);
+  // TODO: implement persistent cache entry
+  PCacheParent* actor = nullptr;
+  if (mKeys.Contains(aKey)) {
+    actor = Manager()->SendPCacheConstructor();
+  }
+  unused << SendGetResponse(aRequestId, actor);
+  return true;
+}
+
+bool
+CacheStorageParent::RecvHas(const uintptr_t& aRequestId, const nsString& aKey)
+{
+  // TODO: implement persistent cache entry
+  unused << SendHasResponse(aRequestId, mKeys.Contains(aKey));
+  return true;
+}
+
+bool
+CacheStorageParent::RecvCreate(const uintptr_t& aRequestId, const nsString& aKey)
+{
+  // TODO: implement persistent cache entry
+  PCacheParent* actor = nullptr;
+  if (!mKeys.Contains(aKey)) {
+    mKeys.AppendElement(aKey);
+    actor = Manager()->SendPCacheConstructor();
+  }
   unused << SendCreateResponse(aRequestId, actor);
+  return true;
+}
+
+bool
+CacheStorageParent::RecvDelete(const uintptr_t& aRequestId, const nsString& aKey)
+{
+  // TODO: implement persistent cache entry
+  unused << SendDeleteResponse(aRequestId, mKeys.RemoveElement(aKey));
+  return true;
+}
+
+bool
+CacheStorageParent::RecvKeys(const uintptr_t& aRequestId)
+{
+  // TODO: implement persistent cache entry
+  unused << SendKeysResponse(aRequestId, mKeys);
   return true;
 }

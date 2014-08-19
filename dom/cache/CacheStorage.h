@@ -39,12 +39,12 @@ public:
 
   // webidl interface methods
   already_AddRefed<Promise> Match(const RequestOrScalarValueString& aRequest,
-                                  const QueryParams& aParams);
-  already_AddRefed<Promise> Get(const nsAString& aKey);
-  already_AddRefed<Promise> Has(const nsAString& aKey);
+                                  const QueryParams& aParams, ErrorResult& aRv);
+  already_AddRefed<Promise> Get(const nsAString& aKey, ErrorResult& aRv);
+  already_AddRefed<Promise> Has(const nsAString& aKey, ErrorResult& aRv);
   already_AddRefed<Promise> Create(const nsAString& aKey, ErrorResult& aRv);
-  already_AddRefed<Promise> Delete(const nsAString& aKey);
-  already_AddRefed<Promise> Keys();
+  already_AddRefed<Promise> Delete(const nsAString& aKey, ErrorResult& aRv);
+  already_AddRefed<Promise> Keys(ErrorResult& aRv);
 
   // binding methods
   static bool PrefEnabled(JSContext* aCx, JSObject* aObj);
@@ -58,14 +58,21 @@ public:
 
   // CacheStorageChildListener methods
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
-  virtual void RecvCreateResponse(uint64_t aRequestId,
+  virtual void RecvGetResponse(uintptr_t aRequestId,
+                               PCacheChild* aActor) MOZ_OVERRIDE;
+  virtual void RecvHasResponse(uintptr_t aRequestId, bool aResult) MOZ_OVERRIDE;
+  virtual void RecvCreateResponse(uintptr_t aRequestId,
                                   PCacheChild* aActor) MOZ_OVERRIDE;
+  virtual void RecvDeleteResponse(uintptr_t aRequestId,
+                                  bool aResult) MOZ_OVERRIDE;
+  virtual void RecvKeysResponse(const uintptr_t& aRequestId,
+                                const nsTArray<nsString>& aKeys) MOZ_OVERRIDE;
 
 private:
   virtual ~CacheStorage();
 
-  typedef uint64_t RequestId;
-  static const uint64_t INVALID_REQUEST_ID = 0;
+  typedef uintptr_t RequestId;
+  static const uintptr_t INVALID_REQUEST_ID = 0;
 
   RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);
   already_AddRefed<Promise> RemoveRequestPromise(RequestId aRequestId);
