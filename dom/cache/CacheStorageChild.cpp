@@ -31,7 +31,7 @@ CacheStorageChild::ActorDestroy(ActorDestroyReason aReason)
 }
 
 bool
-CacheStorageChild::RecvCreateResponse(const uint32_t& aRequestId,
+CacheStorageChild::RecvCreateResponse(const uint64_t& aRequestId,
                                       PCacheChild* aActor)
 {
   MOZ_ASSERT(mListener);

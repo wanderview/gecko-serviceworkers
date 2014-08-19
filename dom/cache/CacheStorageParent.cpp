@@ -28,7 +28,7 @@ CacheStorageParent::ActorDestroy(ActorDestroyReason aReason)
 }
 
 bool
-CacheStorageParent::RecvCreate(const uint32_t& aRequestId, const nsString& aKey)
+CacheStorageParent::RecvCreate(const uint64_t& aRequestId, const nsString& aKey)
 {
   PCacheParent* actor = Manager()->SendPCacheConstructor();
   printf_stderr("### ### CacheStorageParent::RecvCreate(%lu)\n", aRequestId);

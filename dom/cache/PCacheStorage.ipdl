@@ -13,10 +13,10 @@ protocol PCacheStorage
   manager PBackground;
 
 parent:
-  Create(uint32_t aRequestId, nsString aKey);
+  Create(uint64_t aRequestId, nsString aKey);
 
 child:
-  CreateResponse(uint32_t aRequestId, PCache aActor);
+  CreateResponse(uint64_t aRequestId, PCache aActor);
 
 both:
   __delete__();

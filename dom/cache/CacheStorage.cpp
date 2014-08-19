@@ -23,25 +23,11 @@ using mozilla::ipc::BackgroundChild;
 using mozilla::ipc::PBackgroundChild;
 using mozilla::ipc::IProtocol;
 
-// XXX: This is not safe when requests are created on both main thread and
-//      worker thread.
-static uint32_t sNextRequestId = 0;
-
-CacheStorage::Request::Request()
-  : mId(sNextRequestId++)
-{
-}
-
-bool
-CacheStorage::Request::operator==(const CacheStorage::Request& right) const
-{
-  return mId == right.mId;
-}
-
 NS_IMPL_CYCLE_COLLECTING_ADDREF(CacheStorage);
 NS_IMPL_CYCLE_COLLECTING_RELEASE(CacheStorage);
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(CacheStorage, mOwner, mGlobal)
-// TODO: traverse and unlink mRequests promises
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(CacheStorage, mOwner,
+                                                    mGlobal,
+                                                    mRequestPromises)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(CacheStorage)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
@@ -101,15 +87,12 @@ CacheStorage::Create(const nsAString& aKey, ErrorResult& aRv)
     return nullptr;
   }
 
-  Request* request = mRequests.AppendElement();
-  if (!request) {
-    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+  RequestId requestId = AddRequestPromise(promise, aRv);
+  if (requestId == INVALID_REQUEST_ID) {
     return nullptr;
   }
 
-  request->mPromise = promise;
-
-  unused << mActor->SendCreate(request->mId, nsString(aKey));
+  unused << mActor->SendCreate(requestId, nsString(aKey));
 
   return promise.forget();
 }
@@ -187,17 +170,16 @@ CacheStorage::ActorDestroy(IProtocol& aActor)
 }
 
 void
-CacheStorage::RecvCreateResponse(uint32_t aRequestId, PCacheChild* aActor)
+CacheStorage::RecvCreateResponse(uint64_t aRequestId, PCacheChild* aActor)
 {
   MOZ_ASSERT(aActor);
-  Request* request = FindRequestById(aRequestId);
-  if (!request) {
+  nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
+  if (NS_WARN_IF(!promise)) {
     PCacheChild::Send__delete__(aActor);
     return;
   }
   nsRefPtr<Cache> cache = new Cache(mOwner, aActor);
-  request->mPromise->MaybeResolve(cache);
-  mRequests.RemoveElement(*request);
+  promise->MaybeResolve(cache);
 }
 
 CacheStorage::~CacheStorage()
@@ -211,13 +193,38 @@ CacheStorage::~CacheStorage()
   }
 }
 
-CacheStorage::Request*
-CacheStorage::FindRequestById(uint32_t aRequestId)
+CacheStorage::RequestId
+CacheStorage::AddRequestPromise(Promise* aPromise, ErrorResult& aRv)
 {
-  for (uint32_t i = 0; i < mRequests.Length(); ++i) {
-    Request& request = mRequests.ElementAt(i);
-    if (request.mId == aRequestId) {
-      return &request;
+  MOZ_ASSERT(aPromise);
+
+  nsRefPtr<Promise>* ref = mRequestPromises.AppendElement();
+  if (!ref) {
+    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return INVALID_REQUEST_ID;
+  }
+
+  *ref = aPromise;
+
+  // (Ab)use the promise pointer as our request ID.  This is a fast, thread-safe
+  // way to get a unique ID for the promise to be resolved later.
+  return reinterpret_cast<RequestId>(aPromise);
+}
+
+already_AddRefed<Promise>
+CacheStorage::RemoveRequestPromise(RequestId aRequestId)
+{
+  MOZ_ASSERT(aRequestId != INVALID_REQUEST_ID);
+
+  for (uint32_t i = 0; i < mRequestPromises.Length(); ++i) {
+    nsRefPtr<Promise>& promise = mRequestPromises.ElementAt(i);
+    // To be safe, only cast promise pointers to our integer RequestId
+    // type and never cast an integer to a pointer.
+    if (aRequestId == reinterpret_cast<RequestId>(promise.get())) {
+      nsRefPtr<Promise> ref;
+      ref.swap(promise);
+      mRequestPromises.RemoveElementAt(i);
+      return ref.forget();
     }
   }
   return nullptr;

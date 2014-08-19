@@ -33,15 +33,6 @@ class CacheStorage MOZ_FINAL : public nsIIPCBackgroundChildCreateCallback
 {
   typedef mozilla::ipc::PBackgroundChild PBackgroundChild;
 
-  struct Request
-  {
-    explicit Request();
-    bool operator==(const Request& right) const;
-
-    uint32_t mId;
-    nsRefPtr<Promise> mPromise;
-  };
-
 public:
   explicit CacheStorage(nsISupports* aOwner, nsIGlobalObject* aGlobal,
                         const nsACString& aOrigin);
@@ -67,19 +58,23 @@ public:
 
   // CacheStorageChildListener methods
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
-  virtual void RecvCreateResponse(uint32_t aRequestId,
+  virtual void RecvCreateResponse(uint64_t aRequestId,
                                   PCacheChild* aActor) MOZ_OVERRIDE;
 
 private:
   virtual ~CacheStorage();
 
-  Request* FindRequestById(uint32_t aRequestId);
+  typedef uint64_t RequestId;
+  static const uint64_t INVALID_REQUEST_ID = 0;
+
+  RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);
+  already_AddRefed<Promise> RemoveRequestPromise(RequestId aRequestId);
 
   nsCOMPtr<nsISupports> mOwner;
   nsCOMPtr<nsIGlobalObject> mGlobal;
   const nsCString mOrigin;
   CacheStorageChild* mActor;
-  nsTArray<Request> mRequests;
+  nsTArray<nsRefPtr<Promise>> mRequestPromises;
 
 public:
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS

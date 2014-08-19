@@ -22,7 +22,7 @@ class CacheStorageChildListener
 public:
   virtual ~CacheStorageChildListener() { }
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor)=0;
-  virtual void RecvCreateResponse(uint32_t aRequestId, PCacheChild* aActor)=0;
+  virtual void RecvCreateResponse(uint64_t aRequestId, PCacheChild* aActor)=0;
 };
 
 } // namespace dom

@@ -21,7 +21,7 @@ public:
   CacheStorageChild(CacheStorageChildListener& aListener);
   virtual ~CacheStorageChild();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
-  virtual bool RecvCreateResponse(const uint32_t& aRequestId,
+  virtual bool RecvCreateResponse(const uint64_t& aRequestId,
                                   PCacheChild* aActor) MOZ_OVERRIDE;
   void ClearListener();
 private:
