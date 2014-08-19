@@ -15,7 +15,7 @@ interface CacheStorage {
                            optional QueryParams params);
    Promise<Cache> get(DOMString cacheName);
    Promise<boolean> has(DOMString cacheName);
-   Promise<Cache> create(DOMString cacheName);
+   [Throws] Promise<Cache> create(DOMString cacheName);
    Promise<boolean> delete(DOMString cacheName);
    Promise<sequence<DOMString>> keys();
 };

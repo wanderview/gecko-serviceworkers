@@ -6,7 +6,8 @@
 
 #include "mozilla/dom/CacheManager.h"
 
-using mozilla::dom::CacheManager;
+namespace mozilla {
+namespace dom {
 
 static CacheManager* sInstance = nullptr;
 
@@ -38,3 +39,6 @@ CacheManager::~CacheManager()
   sInstance = nullptr;
   printf_stderr("### ### ~CacheManager()\n");
 }
+
+} // namespace dom
+} // namesapce mozilla

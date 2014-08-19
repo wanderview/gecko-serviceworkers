@@ -4,12 +4,11 @@
 
 #include "BackgroundChildImpl.h"
 
-#include "mozilla/dom/CacheStorageChild.h"
 #include "mozilla/dom/CacheChild.h"
+#include "mozilla/dom/PCacheStorageChild.h"
 #include "mozilla/ipc/PBackgroundTestChild.h"
 #include "nsTraceRefcnt.h"
 
-using mozilla::dom::CacheStorageChild;
 using mozilla::dom::PCacheStorageChild;
 using mozilla::dom::CacheChild;
 using mozilla::dom::PCacheChild;
@@ -118,8 +117,7 @@ BackgroundChildImpl::DeallocPCacheStorageChild(PCacheStorageChild* aActor)
 PCacheChild*
 BackgroundChildImpl::AllocPCacheChild()
 {
-  MOZ_CRASH("CacheChild actor must be provided to PBackground manager");
-  return nullptr;
+  return new CacheChild();
 }
 
 bool

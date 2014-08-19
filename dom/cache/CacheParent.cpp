@@ -9,7 +9,8 @@
 #include "mozilla/dom/CacheManager.h"
 #include "nsCOMPtr.h"
 
-using mozilla::dom::CacheParent;
+namespace mozilla {
+namespace dom {
 
 CacheParent::CacheParent()
   : mManager(CacheManager::GetInstance())
@@ -24,3 +25,6 @@ void
 CacheParent::ActorDestroy(ActorDestroyReason aReason)
 {
 }
+
+} // namespace dom
+} // namesapce mozilla

@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef mozilla_dom_ActorDestroyListener_h
-#define mozilla_dom_ActorDestroyListener_h
+#ifndef mozilla_dom_CacheChildListener_h
+#define mozilla_dom_CacheChildListener_h
 
 namespace mozilla {
 
@@ -15,14 +15,14 @@ namespace ipc {
 
 namespace dom {
 
-class ActorDestroyListener
+class CacheChildListener
 {
 public:
-  virtual ~ActorDestroyListener() { }
+  virtual ~CacheChildListener() { }
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor)=0;
 };
 
 } // namespace dom
 } // namespace mozilla
 
-#endif // mozilla_dom_ActorDestroyListener_h
+#endif // mozilla_dom_CacheChildListener_h

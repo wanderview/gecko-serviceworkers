@@ -10775,7 +10775,7 @@ nsGlobalWindow::Caches()
     if (!principal || NS_FAILED(principal->GetOrigin(getter_Copies(origin)))) {
       origin.AssignLiteral("null");
     }
-    mCacheStorage = new CacheStorage(ToSupports(this), origin);
+    mCacheStorage = new CacheStorage(ToSupports(this), this, origin);
   }
 
   nsRefPtr<CacheStorage> ref = mCacheStorage;

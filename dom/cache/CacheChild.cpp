@@ -6,12 +6,12 @@
 
 #include "mozilla/dom/CacheChild.h"
 
-#include "mozilla/dom/ActorDestroyListener.h"
+#include "mozilla/dom/CacheChildListener.h"
 
-using mozilla::dom::CacheChild;
+namespace mozilla {
+namespace dom {
 
-CacheChild::CacheChild(ActorDestroyListener& aListener)
-  : mListener(&aListener)
+CacheChild::CacheChild()
 {
 }
 
@@ -31,8 +31,18 @@ CacheChild::ActorDestroy(ActorDestroyReason aReason)
 }
 
 void
-CacheChild::ClearActorDestroyListener()
+CacheChild::SetListener(CacheChildListener& aListener)
+{
+  MOZ_ASSERT(!mListener);
+  mListener = &aListener;
+}
+
+void
+CacheChild::ClearListener()
 {
   MOZ_ASSERT(mListener);
   mListener = nullptr;
 }
+
+} // namespace dom
+} // namesapce mozilla

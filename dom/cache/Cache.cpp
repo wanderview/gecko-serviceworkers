@@ -5,7 +5,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/Cache.h"
+
 #include "mozilla/dom/CacheBinding.h"
+#include "mozilla/dom/CacheChild.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/Preferences.h"
 
@@ -21,9 +23,11 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Cache)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-Cache::Cache(nsISupports* aOwner)
-: mOwner(aOwner)
+Cache::Cache(nsISupports* aOwner, PCacheChild* aActor)
+  : mOwner(aOwner)
+  , mActor(static_cast<CacheChild*>(aActor))
 {
+  MOZ_ASSERT(mActor);
   SetIsDOMBinding();
 }
 
@@ -116,8 +120,23 @@ Cache::WrapObject(JSContext* aContext)
   return CacheBinding::Wrap(aContext, this);
 }
 
+void
+Cache::ActorDestroy(mozilla::ipc::IProtocol& aActor)
+{
+  MOZ_ASSERT(mActor);
+  MOZ_ASSERT(mActor == &aActor);
+  mActor->ClearListener();
+  mActor = nullptr;
+}
+
 Cache::~Cache()
 {
+  if (mActor) {
+    mActor->ClearListener();
+    PCacheChild::Send__delete__(mActor);
+    // The actor will be deleted by the IPC manager
+    mActor = nullptr;
+  }
 }
 
 } // namespace dom

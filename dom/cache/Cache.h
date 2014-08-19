@@ -7,6 +7,7 @@
 #ifndef mozilla_dom_Cache_h
 #define mozilla_dom_Cache_h
 
+#include "mozilla/dom/CacheChildListener.h"
 #include "nsCOMPtr.h"
 #include "nsISupportsImpl.h"
 #include "nsWrapperCache.h"
@@ -14,8 +15,10 @@
 namespace mozilla {
 namespace dom {
 
-class Promise;
+class CacheChild;
 class OwningRequestOrScalarValueString;
+class Promise;
+class PCacheChild;
 class RequestOrScalarValueString;
 class QueryParams;
 class Response;
@@ -24,8 +27,11 @@ template<typename T> class Sequence;
 
 class Cache MOZ_FINAL : public nsISupports
                       , public nsWrapperCache
+                      , public CacheChildListener
 {
 public:
+  Cache(nsISupports* aOwner, PCacheChild* aActor);
+
   // webidl interface methods
   already_AddRefed<Promise> Match(const RequestOrScalarValueString& aRequest,
                                   const QueryParams& aParams);
@@ -46,15 +52,19 @@ public:
   virtual nsISupports* GetParentObject() const MOZ_OVERRIDE;
   virtual JSObject* WrapObject(JSContext* aContext) MOZ_OVERRIDE;
 
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(Cache)
+  // CacheChildListener methods
+  virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
 
 private:
-  Cache(nsISupports* aOwner);
   virtual ~Cache();
 
 private:
   nsCOMPtr<nsISupports> mOwner;
+  CacheChild* mActor;
+
+public:
+  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(Cache)
 };
 
 } // namespace dom

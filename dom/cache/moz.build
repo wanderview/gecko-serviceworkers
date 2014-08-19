@@ -7,10 +7,12 @@
 EXPORTS.mozilla.dom += [
     'Cache.h',
     'CacheChild.h',
+    'CacheChildListener.h',
     'CacheManager.h',
     'CacheParent.h',
     'CacheStorage.h',
     'CacheStorageChild.h',
+    'CacheStorageChildListener.h',
     'CacheStorageParent.h',
 ]
 

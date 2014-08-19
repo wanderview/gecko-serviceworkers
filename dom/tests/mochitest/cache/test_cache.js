@@ -1,2 +1,5 @@
 ok(!!caches, 'caches object should be available on global');
-workerTestDone();
+caches.create('snafu').then(function(cache) {
+  ok(!!cache, 'cache object should be resolved from caches.create');
+  workerTestDone();
+});

@@ -14,10 +14,13 @@
     removeEventListener("message", messageListener);
     var success = true;
     success = success && !!caches;
-    parent.postMessage({
-      type: "result",
-      success: success
-    }, "*");
+    caches.create("foobar").then(function(cache) {
+      success = success && !!cache;
+      parent.postMessage({
+        type: "result",
+        success: success
+      }, "*");
+    });
   });
 </script>
 </body>

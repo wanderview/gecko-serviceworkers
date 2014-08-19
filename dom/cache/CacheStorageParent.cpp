@@ -7,12 +7,14 @@
 #include "mozilla/dom/CacheStorageParent.h"
 
 #include "mozilla/dom/CacheManager.h"
+#include "mozilla/ipc/PBackgroundParent.h"
+#include "mozilla/unused.h"
 #include "nsCOMPtr.h"
 
 using mozilla::dom::CacheStorageParent;
 
 CacheStorageParent::CacheStorageParent(const nsACString& aOrigin)
-  : mManager(CacheManager::GetInstance())
+  : mCacheManager(CacheManager::GetInstance())
 {
 }
 
@@ -23,4 +25,13 @@ CacheStorageParent::~CacheStorageParent()
 void
 CacheStorageParent::ActorDestroy(ActorDestroyReason aReason)
 {
+}
+
+bool
+CacheStorageParent::RecvCreate(const uint32_t& aRequestId, const nsString& aKey)
+{
+  PCacheParent* actor = Manager()->SendPCacheConstructor();
+  printf_stderr("### ### CacheStorageParent::RecvCreate(%lu)\n", aRequestId);
+  unused << SendCreateResponse(aRequestId, actor);
+  return true;
 }

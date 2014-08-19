@@ -12,19 +12,20 @@
 namespace mozilla {
 namespace dom {
 
-class ActorDestroyListener;
+class CacheStorageChildListener;
+class PCacheChild;
 
 class CacheStorageChild MOZ_FINAL : public PCacheStorageChild
 {
-  ActorDestroyListener* mListener;
-
 public:
-  CacheStorageChild(ActorDestroyListener& aListener);
+  CacheStorageChild(CacheStorageChildListener& aListener);
   virtual ~CacheStorageChild();
-
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
-
-  void ClearActorDestroyListener();
+  virtual bool RecvCreateResponse(const uint32_t& aRequestId,
+                                  PCacheChild* aActor) MOZ_OVERRIDE;
+  void ClearListener();
+private:
+  CacheStorageChildListener* mListener;
 };
 
 } // namespace dom

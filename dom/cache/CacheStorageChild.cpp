@@ -6,11 +6,11 @@
 
 #include "mozilla/dom/CacheStorageChild.h"
 
-#include "mozilla/dom/ActorDestroyListener.h"
+#include "mozilla/dom/CacheStorageChildListener.h"
 
 using mozilla::dom::CacheStorageChild;
 
-CacheStorageChild::CacheStorageChild(ActorDestroyListener& aListener)
+CacheStorageChild::CacheStorageChild(CacheStorageChildListener& aListener)
   : mListener(&aListener)
 {
 }
@@ -30,8 +30,17 @@ CacheStorageChild::ActorDestroy(ActorDestroyReason aReason)
   }
 }
 
+bool
+CacheStorageChild::RecvCreateResponse(const uint32_t& aRequestId,
+                                      PCacheChild* aActor)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvCreateResponse(aRequestId, aActor);
+  return true;
+}
+
 void
-CacheStorageChild::ClearActorDestroyListener()
+CacheStorageChild::ClearListener()
 {
   MOZ_ASSERT(mListener);
   mListener = nullptr;

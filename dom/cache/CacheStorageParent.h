@@ -22,8 +22,9 @@ public:
   CacheStorageParent(const nsACString& aOrigin);
   virtual ~CacheStorageParent();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
+  virtual bool RecvCreate(const uint32_t& aRequestId, const nsString& aKey) MOZ_OVERRIDE;
 private:
-  nsRefPtr<CacheManager> mManager;
+  nsRefPtr<CacheManager> mCacheManager;
 };
 
 } // namespace dom

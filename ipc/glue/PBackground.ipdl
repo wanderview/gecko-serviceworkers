@@ -20,6 +20,8 @@ parent:
   PBackgroundTest(nsCString testArg);
 
   PCacheStorage(nsCString origin);
+
+both:
   PCache();
 };
 
