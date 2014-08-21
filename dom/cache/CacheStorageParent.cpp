@@ -6,7 +6,7 @@
 
 #include "mozilla/dom/CacheStorageParent.h"
 
-#include "mozilla/dom/CacheManager.h"
+#include "mozilla/dom/CacheStorageManager.h"
 #include "mozilla/ipc/PBackgroundParent.h"
 #include "mozilla/unused.h"
 #include "nsCOMPtr.h"
@@ -14,8 +14,9 @@
 using mozilla::dom::CacheStorageParent;
 
 CacheStorageParent::CacheStorageParent(const nsACString& aOrigin)
-  : mCacheManager(CacheManager::GetInstance())
+  : mCacheStorageManager(CacheStorageManager::GetInstance())
 {
+  MOZ_ASSERT(mCacheStorageManager);
 }
 
 CacheStorageParent::~CacheStorageParent()
@@ -30,11 +31,11 @@ CacheStorageParent::ActorDestroy(ActorDestroyReason aReason)
 bool
 CacheStorageParent::RecvGet(const uintptr_t& aRequestId, const nsString& aKey)
 {
-  // TODO: implement persistent cache entry
-  PCacheParent* actor = nullptr;
-  if (mKeys.Contains(aKey)) {
-    actor = Manager()->SendPCacheConstructor();
+  CacheParent* actor = mCacheStorageManager->Get(aKey);
+  if (actor) {
+    actor = static_cast<CacheParent*>(Manager()->SendPCacheConstructor(actor));
   }
+  printf_stderr("### ### CacheStorageParent::RecvCreate() sending get response %p\n", actor);
   unused << SendGetResponse(aRequestId, actor);
   return true;
 }
@@ -42,20 +43,27 @@ CacheStorageParent::RecvGet(const uintptr_t& aRequestId, const nsString& aKey)
 bool
 CacheStorageParent::RecvHas(const uintptr_t& aRequestId, const nsString& aKey)
 {
-  // TODO: implement persistent cache entry
-  unused << SendHasResponse(aRequestId, mKeys.Contains(aKey));
+  printf_stderr("### ### CacheStorageParent::RecvCreate() sending has response\n");
+  unused << SendHasResponse(aRequestId, mCacheStorageManager->Has(aKey));
   return true;
 }
 
 bool
 CacheStorageParent::RecvCreate(const uintptr_t& aRequestId, const nsString& aKey)
 {
-  // TODO: implement persistent cache entry
-  PCacheParent* actor = nullptr;
-  if (!mKeys.Contains(aKey)) {
-    mKeys.AppendElement(aKey);
-    actor = Manager()->SendPCacheConstructor();
+  CacheParent* actor = nullptr;
+  if (!mCacheStorageManager->Has(aKey)) {
+    actor = new CacheParent();
+    printf_stderr("### ### CacheStorageParent::RecvCreate() allocated actor %p\n", actor);
+    actor = static_cast<CacheParent*>(Manager()->SendPCacheConstructor(actor));
+    printf_stderr("### ### CacheStorageParent::RecvCreate() constructed actor %p\n", actor);
+    if (actor) {
+      if (!mCacheStorageManager->Put(aKey, actor)) {
+        printf_stderr("### ### CacheStorageParent::RecvCreate() create failed to store actor\n");
+      }
+    }
   }
+  printf_stderr("### ### CacheStorageParent::RecvCreate() sending create response %p\n", actor);
   unused << SendCreateResponse(aRequestId, actor);
   return true;
 }
@@ -63,15 +71,17 @@ CacheStorageParent::RecvCreate(const uintptr_t& aRequestId, const nsString& aKey
 bool
 CacheStorageParent::RecvDelete(const uintptr_t& aRequestId, const nsString& aKey)
 {
-  // TODO: implement persistent cache entry
-  unused << SendDeleteResponse(aRequestId, mKeys.RemoveElement(aKey));
+  printf_stderr("### ### CacheStorageParent::RecvCreate() sending delete response\n");
+  unused << SendDeleteResponse(aRequestId, mCacheStorageManager->Delete(aKey));
   return true;
 }
 
 bool
 CacheStorageParent::RecvKeys(const uintptr_t& aRequestId)
 {
-  // TODO: implement persistent cache entry
-  unused << SendKeysResponse(aRequestId, mKeys);
+  nsTArray<nsString> keys;
+  mCacheStorageManager->Keys(keys);
+  printf_stderr("### ### CacheStorageParent::RecvCreate() sending keys response\n");
+  unused << SendKeysResponse(aRequestId, keys);
   return true;
 }

@@ -14,8 +14,6 @@ template <class T> class nsRefPtr;
 namespace mozilla {
 namespace dom {
 
-class CacheManager;
-
 class CacheParent MOZ_FINAL : public PCacheParent
 {
 public:
@@ -23,7 +21,6 @@ public:
   virtual ~CacheParent();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
 private:
-  nsRefPtr<CacheManager> mManager;
 };
 
 } // namespace dom

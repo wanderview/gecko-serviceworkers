@@ -14,7 +14,7 @@ template <class T> class nsRefPtr;
 namespace mozilla {
 namespace dom {
 
-class CacheManager;
+class CacheStorageManager;
 
 class CacheStorageParent MOZ_FINAL : public PCacheStorageParent
 {
@@ -32,7 +32,7 @@ public:
                           const nsString& aKey) MOZ_OVERRIDE;
   virtual bool RecvKeys(const uintptr_t& aRequestId) MOZ_OVERRIDE;
 private:
-  nsRefPtr<CacheManager> mCacheManager;
+  nsRefPtr<CacheStorageManager> mCacheStorageManager;
   nsTArray<nsString> mKeys;
 };
 

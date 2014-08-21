@@ -6,14 +6,12 @@
 
 #include "mozilla/dom/CacheParent.h"
 
-#include "mozilla/dom/CacheManager.h"
 #include "nsCOMPtr.h"
 
 namespace mozilla {
 namespace dom {
 
 CacheParent::CacheParent()
-  : mManager(CacheManager::GetInstance())
 {
 }
 
