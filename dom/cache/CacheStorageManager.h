@@ -14,6 +14,7 @@ namespace mozilla {
 namespace dom {
 
 class CacheParent;
+class CacheStorageDBConnection;
 
 class CacheStorageManager MOZ_FINAL : public nsISupports
 {

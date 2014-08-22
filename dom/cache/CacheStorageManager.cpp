@@ -7,6 +7,7 @@
 #include "mozilla/dom/CacheStorageManager.h"
 
 #include "mozilla/dom/CacheParent.h"
+#include "mozilla/dom/CacheStorageDBConnection.h"
 
 namespace mozilla {
 namespace dom {
