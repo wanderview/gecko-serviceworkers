@@ -10771,11 +10771,15 @@ nsGlobalWindow::Caches()
 {
   if (!mCacheStorage) {
     nsAutoCString origin;
+    nsAutoCString baseDomain;
     nsCOMPtr<nsIPrincipal> principal = GetPrincipal();
-    if (!principal || NS_FAILED(principal->GetOrigin(getter_Copies(origin)))) {
+    if (!principal ||
+        NS_FAILED(principal->GetOrigin(getter_Copies(origin))) ||
+        NS_FAILED(principal->GetBaseDomain(baseDomain))) {
       origin.AssignLiteral("null");
+      baseDomain.AssignLiteral("");
     }
-    mCacheStorage = new CacheStorage(ToSupports(this), this, origin);
+    mCacheStorage = new CacheStorage(ToSupports(this), this, origin, baseDomain);
   }
 
   nsRefPtr<CacheStorage> ref = mCacheStorage;

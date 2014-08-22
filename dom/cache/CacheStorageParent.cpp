@@ -13,8 +13,11 @@
 
 using mozilla::dom::CacheStorageParent;
 
-CacheStorageParent::CacheStorageParent(const nsACString& aOrigin)
-  : mCacheStorageManager(CacheStorageManager::GetInstance())
+CacheStorageParent::CacheStorageParent(const nsACString& aOrigin,
+                                       const nsACString& aBaseDomain)
+  : mOrigin(aOrigin)
+  , mBaseDomain(aBaseDomain)
+  , mCacheStorageManager(CacheStorageManager::GetInstance())
 {
   MOZ_ASSERT(mCacheStorageManager);
 }
@@ -35,7 +38,6 @@ CacheStorageParent::RecvGet(const uintptr_t& aRequestId, const nsString& aKey)
   if (actor) {
     actor = static_cast<CacheParent*>(Manager()->SendPCacheConstructor(actor));
   }
-  printf_stderr("### ### CacheStorageParent::RecvCreate() sending get response %p\n", actor);
   unused << SendGetResponse(aRequestId, actor);
   return true;
 }
@@ -43,7 +45,6 @@ CacheStorageParent::RecvGet(const uintptr_t& aRequestId, const nsString& aKey)
 bool
 CacheStorageParent::RecvHas(const uintptr_t& aRequestId, const nsString& aKey)
 {
-  printf_stderr("### ### CacheStorageParent::RecvCreate() sending has response\n");
   unused << SendHasResponse(aRequestId, mCacheStorageManager->Has(aKey));
   return true;
 }
@@ -54,16 +55,14 @@ CacheStorageParent::RecvCreate(const uintptr_t& aRequestId, const nsString& aKey
   CacheParent* actor = nullptr;
   if (!mCacheStorageManager->Has(aKey)) {
     actor = new CacheParent();
-    printf_stderr("### ### CacheStorageParent::RecvCreate() allocated actor %p\n", actor);
     actor = static_cast<CacheParent*>(Manager()->SendPCacheConstructor(actor));
-    printf_stderr("### ### CacheStorageParent::RecvCreate() constructed actor %p\n", actor);
     if (actor) {
       if (!mCacheStorageManager->Put(aKey, actor)) {
-        printf_stderr("### ### CacheStorageParent::RecvCreate() create failed to store actor\n");
+        unused << PCacheParent::Send__delete__(actor);
+        actor = nullptr;
       }
     }
   }
-  printf_stderr("### ### CacheStorageParent::RecvCreate() sending create response %p\n", actor);
   unused << SendCreateResponse(aRequestId, actor);
   return true;
 }
@@ -71,7 +70,6 @@ CacheStorageParent::RecvCreate(const uintptr_t& aRequestId, const nsString& aKey
 bool
 CacheStorageParent::RecvDelete(const uintptr_t& aRequestId, const nsString& aKey)
 {
-  printf_stderr("### ### CacheStorageParent::RecvCreate() sending delete response\n");
   unused << SendDeleteResponse(aRequestId, mCacheStorageManager->Delete(aKey));
   return true;
 }
@@ -81,7 +79,6 @@ CacheStorageParent::RecvKeys(const uintptr_t& aRequestId)
 {
   nsTArray<nsString> keys;
   mCacheStorageManager->Keys(keys);
-  printf_stderr("### ### CacheStorageParent::RecvCreate() sending keys response\n");
   unused << SendKeysResponse(aRequestId, keys);
   return true;
 }

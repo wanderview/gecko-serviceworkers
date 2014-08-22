@@ -19,7 +19,7 @@ class CacheStorageManager;
 class CacheStorageParent MOZ_FINAL : public PCacheStorageParent
 {
 public:
-  CacheStorageParent(const nsACString& aOrigin);
+  CacheStorageParent(const nsACString& aOrigin, const nsACString& mBaseDomain);
   virtual ~CacheStorageParent();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
   virtual bool RecvGet(const uintptr_t& aRequestId,
@@ -32,6 +32,8 @@ public:
                           const nsString& aKey) MOZ_OVERRIDE;
   virtual bool RecvKeys(const uintptr_t& aRequestId) MOZ_OVERRIDE;
 private:
+  const nsCString mOrigin;
+  const nsCString mBaseDomain;
   nsRefPtr<CacheStorageManager> mCacheStorageManager;
   nsTArray<nsString> mKeys;
 };

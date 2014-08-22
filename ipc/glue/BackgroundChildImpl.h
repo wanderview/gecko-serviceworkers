@@ -46,7 +46,8 @@ protected:
   DeallocPBackgroundTestChild(PBackgroundTestChild* aActor) MOZ_OVERRIDE;
 
   virtual mozilla::dom::PCacheStorageChild*
-  AllocPCacheStorageChild(const nsCString& aOrigin) MOZ_OVERRIDE;
+  AllocPCacheStorageChild(const nsCString& aOrigin,
+                          const nsCString& aBaseDomain) MOZ_OVERRIDE;
 
   virtual bool
   DeallocPCacheStorageChild(mozilla::dom::PCacheStorageChild* aActor) MOZ_OVERRIDE;

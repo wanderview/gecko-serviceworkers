@@ -19,7 +19,7 @@ parent:
   // Only called at startup during mochitests to check the basic infrastructure.
   PBackgroundTest(nsCString testArg);
 
-  PCacheStorage(nsCString origin);
+  PCacheStorage(nsCString origin, nsCString baseDomain);
 
 both:
   PCache();

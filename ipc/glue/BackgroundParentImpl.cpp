@@ -115,9 +115,10 @@ BackgroundParentImpl::DeallocPBackgroundTestParent(
 }
 
 PCacheStorageParent*
-BackgroundParentImpl::AllocPCacheStorageParent(const nsCString& aOrigin)
+BackgroundParentImpl::AllocPCacheStorageParent(const nsCString& aOrigin,
+                                               const nsCString& aBaseDomain)
 {
-  return new CacheStorageParent(aOrigin);
+  return new CacheStorageParent(aOrigin, aBaseDomain);
 }
 
 bool

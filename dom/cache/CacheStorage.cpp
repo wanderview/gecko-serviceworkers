@@ -36,16 +36,22 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(CacheStorage)
 NS_INTERFACE_MAP_END
 
 CacheStorage::CacheStorage(nsISupports* aOwner, nsIGlobalObject* aGlobal,
-                           const nsACString& aOrigin)
+                           const nsACString& aOrigin,
+                           const nsACString& aBaseDomain)
   : mOwner(aOwner)
   , mGlobal(aGlobal)
   , mOrigin(aOrigin)
+  , mBaseDomain(aBaseDomain)
   , mActor(nullptr)
 {
   MOZ_ASSERT(mGlobal);
 
-  // TODO: Add thread assertions
   SetIsDOMBinding();
+
+  if (mOrigin.EqualsLiteral("null") || mBaseDomain.EqualsLiteral("")) {
+    ActorFailed();
+    return;
+  }
 
   PBackgroundChild* actor = BackgroundChild::GetForCurrentThread();
   if (actor) {
@@ -187,7 +193,6 @@ CacheStorage::WrapObject(JSContext* aContext)
 void
 CacheStorage::ActorCreated(PBackgroundChild* aActor)
 {
-  // TODO: Add thread assertions
   MOZ_ASSERT(aActor);
 
   CacheStorageChild* newActor = new CacheStorageChild(*this);
@@ -197,7 +202,7 @@ CacheStorage::ActorCreated(PBackgroundChild* aActor)
   }
 
   PCacheStorageChild* constructedActor =
-    aActor->SendPCacheStorageConstructor(newActor, mOrigin);
+    aActor->SendPCacheStorageConstructor(newActor, mOrigin, mBaseDomain);
 
   if (NS_WARN_IF(!constructedActor)) {
     ActorFailed();
@@ -211,14 +216,14 @@ CacheStorage::ActorCreated(PBackgroundChild* aActor)
 void
 CacheStorage::ActorFailed()
 {
-  // TODO: Add thread assertions
+  // TODO: This should reject any pending Promises and cause all future
+  //       Promises created by this object to immediately reject.
   MOZ_CRASH("not implemented");
 }
 
 void
 CacheStorage::ActorDestroy(IProtocol& aActor)
 {
-  // TODO: Add thread assertions
   MOZ_ASSERT(mActor);
   MOZ_ASSERT(mActor == &aActor);
   mActor->ClearListener();
@@ -298,7 +303,6 @@ CacheStorage::RecvKeysResponse(const uintptr_t& aRequestId,
 
 CacheStorage::~CacheStorage()
 {
-  // TODO: Add thread assertions
   if (mActor) {
     mActor->ClearListener();
     PCacheStorageChild::Send__delete__(mActor);

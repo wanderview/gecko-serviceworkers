@@ -103,7 +103,8 @@ WorkerGlobalScope::Caches()
   if (!mCacheStorage) {
     MOZ_ASSERT(mWorkerPrivate);
     NS_ConvertUTF16toUTF8 origin(mWorkerPrivate->GetLocationInfo().mOrigin);
-    mCacheStorage = new CacheStorage(nullptr, this, origin);
+    mCacheStorage = new CacheStorage(nullptr, this, origin,
+                                     mWorkerPrivate->Domain());
   }
 
   nsRefPtr<CacheStorage> ref = mCacheStorage;

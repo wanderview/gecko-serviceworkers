@@ -34,8 +34,8 @@ class CacheStorage MOZ_FINAL : public nsIIPCBackgroundChildCreateCallback
   typedef mozilla::ipc::PBackgroundChild PBackgroundChild;
 
 public:
-  explicit CacheStorage(nsISupports* aOwner, nsIGlobalObject* aGlobal,
-                        const nsACString& aOrigin);
+  CacheStorage(nsISupports* aOwner, nsIGlobalObject* aGlobal,
+               const nsACString& aOrigin, const nsACString& aBaseDomain);
 
   // webidl interface methods
   already_AddRefed<Promise> Match(const RequestOrScalarValueString& aRequest,
@@ -80,6 +80,7 @@ private:
   nsCOMPtr<nsISupports> mOwner;
   nsCOMPtr<nsIGlobalObject> mGlobal;
   const nsCString mOrigin;
+  const nsCString mBaseDomain;
   CacheStorageChild* mActor;
   nsTArray<nsRefPtr<Promise>> mRequestPromises;
 
