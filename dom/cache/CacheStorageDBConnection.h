@@ -16,31 +16,38 @@ class nsID;
 namespace mozilla {
 namespace dom {
 
+class CacheStorageDBListener;
+
 class CacheStorageDBConnection MOZ_FINAL
 {
 public:
   static already_AddRefed<CacheStorageDBConnection>
-  Get(const nsACString& aOrigin, const nsACString& aBaseDomain);
+  Get(CacheStorageDBListener& aListener,
+      const nsACString& aOrigin, const nsACString& aBaseDomain);
 
   static already_AddRefed<CacheStorageDBConnection>
-  GetOrCreate(const nsACString& aOrigin, const nsACString& aBaseDomain);
+  GetOrCreate(CacheStorageDBListener& aListener,
+              const nsACString& aOrigin, const nsACString& aBaseDomain);
 
-  already_AddRefed<nsID> Get(const nsAString& aKey);
-  bool Has(const nsAString& aKey);
-  bool Put(const nsAString& aKey, nsID* aCacheId);
-  bool Delete(const nsAString& aKey);
-  void Keys(nsTArray<nsString> aKeysOut);
+  nsresult Get(uintptr_t aRequestId, const nsAString& aKey);
+  nsresult Has(uintptr_t aRequestId, const nsAString& aKey);
+  nsresult Put(uintptr_t aRequestId, const nsAString& aKey, const nsID& aCacheId);
+  nsresult Delete(uintptr_t aRequestId, const nsAString& aKey);
+  nsresult Keys(uintptr_t aRequestId);
 
 private:
-  CacheStorageDBConnection(already_AddRefed<mozIStorageConnection> aConnection);
+  CacheStorageDBConnection(CacheStorageDBListener& aListener,
+                           already_AddRefed<mozIStorageConnection> aConnection);
   ~CacheStorageDBConnection();
 
   static already_AddRefed<CacheStorageDBConnection>
-  GetOrCreateInternal(const nsACString& aOrigin, const nsACString& aBaseDomain,
+  GetOrCreateInternal(CacheStorageDBListener& aListener,
+                      const nsACString& aOrigin, const nsACString& aBaseDomain,
                       bool allowCreate);
 
   static const int32_t kLatestSchemaVersion = 1;
 
+  CacheStorageDBListener& mListener;
   nsCOMPtr<mozIStorageConnection> mConnection;
 
 public:

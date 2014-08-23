@@ -6,9 +6,11 @@
 
 #include "mozilla/dom/CacheStorageDBConnection.h"
 
+#include "mozilla/dom/CacheStorageDBListener.h"
 #include "mozilla/dom/quota/QuotaManager.h"
 #include "mozIStorageConnection.h"
 #include "mozIStorageService.h"
+#include "mozIStorageStatement.h"
 #include "mozStorageCID.h"
 #include "nsIFile.h"
 #include "nsNetUtil.h"
@@ -22,23 +24,167 @@ using mozilla::dom::quota::QuotaManager;
 
 // static
 already_AddRefed<CacheStorageDBConnection>
-CacheStorageDBConnection::Get(const nsACString& aOrigin,
+CacheStorageDBConnection::Get(CacheStorageDBListener& aListener,
+                              const nsACString& aOrigin,
                               const nsACString& aBaseDomain)
 {
-  return GetOrCreateInternal(aOrigin, aBaseDomain, false);
+  return GetOrCreateInternal(aListener, aOrigin, aBaseDomain, false);
 }
 
 // static
 already_AddRefed<CacheStorageDBConnection>
-CacheStorageDBConnection::GetOrCreate(const nsACString& aOrigin,
+CacheStorageDBConnection::GetOrCreate(CacheStorageDBListener& aListener,
+                                      const nsACString& aOrigin,
                                       const nsACString& aBaseDomain)
 {
-  return GetOrCreateInternal(aOrigin, aBaseDomain, true);
+  return GetOrCreateInternal(aListener, aOrigin, aBaseDomain, true);
+}
+
+nsresult
+CacheStorageDBConnection::Get(uintptr_t aRequestId, const nsAString& aKey)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT cache_uuid FROM caches WHERE key=?1"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindStringParameter(0, aKey);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // TODO: do this async
+  // TODO: use a transaction
+
+  bool hasMoreData;
+  rv = statement->ExecuteStep(&hasMoreData);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsAutoCString uuidString;
+  rv = statement->GetUTF8String(0, uuidString);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsID uuid;
+  NS_ENSURE_TRUE(uuid.Parse(uuidString.get()), NS_ERROR_FAILURE);
+
+  mListener.OnGet(aRequestId, uuid);
+  return NS_OK;
+}
+
+nsresult
+CacheStorageDBConnection::Has(uintptr_t aRequestId, const nsAString& aKey)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT count(*) FROM caches WHERE key=?1"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindStringParameter(0, aKey);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // TODO: do this async
+  // TODO: use a transaction
+
+  bool hasMoreData;
+  rv = statement->ExecuteStep(&hasMoreData);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  int32_t count;
+  rv = statement->GetInt32(0, &count);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  mListener.OnHas(aRequestId, count > 0);
+  return NS_OK;
+}
+
+nsresult
+CacheStorageDBConnection::Put(uintptr_t aRequestId, const nsAString& aKey,
+                              const nsID& aCacheId)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "INSERT INTO caches (key, cache_uuid)VALUES(?1, ?2)"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindStringParameter(0, aKey);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  char uuidBuf[NSID_LENGTH];
+  aCacheId.ToProvidedString(uuidBuf);
+
+  rv = statement->BindUTF8StringParameter(1, nsAutoCString(uuidBuf));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // TODO: do this async
+  // TODO: use a transaction
+
+  rv = statement->Execute();
+  bool result = NS_SUCCEEDED(rv);
+
+  mListener.OnPut(aRequestId, result);
+  return NS_OK;
+}
+
+nsresult
+CacheStorageDBConnection::Delete(uintptr_t aRequestId, const nsAString& aKey)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "DELETE FROM caches WHERE key=?1"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindStringParameter(0, aKey);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // TODO: do this async
+  // TODO: use a transaction
+
+  rv = statement->Execute();
+  bool result = NS_SUCCEEDED(rv);
+
+  mListener.OnDelete(aRequestId, result);
+  return NS_OK;
+}
+
+nsresult
+CacheStorageDBConnection::Keys(uintptr_t aRequestId)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT key FROM caches"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // TODO: do this async
+  // TODO: use a transaction
+
+  nsTArray<nsString> keys;
+
+  bool hasMoreData;
+  while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
+    nsString* key = keys.AppendElement();
+    NS_ENSURE_TRUE(key, NS_ERROR_OUT_OF_MEMORY);
+    rv = statement->GetString(0, *key);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  mListener.OnKeys(aRequestId, keys);
+  return NS_OK;
 }
 
 CacheStorageDBConnection::
-CacheStorageDBConnection(already_AddRefed<mozIStorageConnection> aConnection)
-  : mConnection(aConnection)
+CacheStorageDBConnection(CacheStorageDBListener& aListener,
+                         already_AddRefed<mozIStorageConnection> aConnection)
+  : mListener(aListener)
+  , mConnection(aConnection)
 {
 }
 
@@ -46,38 +192,10 @@ CacheStorageDBConnection::~CacheStorageDBConnection()
 {
 }
 
-already_AddRefed<nsID>
-CacheStorageDBConnection::Get(const nsAString& aKey)
-{
-  return nullptr;
-}
-
-bool
-CacheStorageDBConnection::Has(const nsAString& aKey)
-{
-  return false;
-}
-
-bool
-CacheStorageDBConnection::Put(const nsAString& aKey, nsID* aCacheId)
-{
-  return false;
-}
-
-bool
-CacheStorageDBConnection::Delete(const nsAString& aKey)
-{
-  return false;
-}
-
-void
-CacheStorageDBConnection::Keys(nsTArray<nsString> aKeysOut)
-{
-}
-
 //static
 already_AddRefed<CacheStorageDBConnection>
-CacheStorageDBConnection::GetOrCreateInternal(const nsACString& aOrigin,
+CacheStorageDBConnection::GetOrCreateInternal(CacheStorageDBListener& aListener,
+                                              const nsACString& aOrigin,
                                               const nsACString& aBaseDomain,
                                               bool allowCreate)
 {
@@ -87,10 +205,9 @@ CacheStorageDBConnection::GetOrCreateInternal(const nsACString& aOrigin,
   const PersistenceType persistenceType = PERSISTENCE_TYPE_PERSISTENT;
 
   nsCOMPtr<nsIFile> dbDir;
-  nsresult rv = quota->EnsureOriginIsInitialized(persistenceType,
-                                                 aBaseDomain, aOrigin,
-                                                 true, // aTrackQuota
-                                                 getter_AddRefs(dbDir));
+  nsresult rv = quota->GetDirectoryForOrigin(persistenceType,
+                                             aOrigin,
+                                             getter_AddRefs(dbDir));
   NS_ENSURE_SUCCESS(rv, nullptr);
 
   rv = dbDir->Append(NS_LITERAL_STRING("cachestorage"));
@@ -184,12 +301,15 @@ CacheStorageDBConnection::GetOrCreateInternal(const nsACString& aOrigin,
 
     conn->SetSchemaVersion(kLatestSchemaVersion);
     NS_ENSURE_SUCCESS(rv, nullptr);
+
+    rv = conn->GetSchemaVersion(&schemaVersion);
+    NS_ENSURE_SUCCESS(rv, nullptr);
   }
 
   NS_ENSURE_TRUE(schemaVersion == kLatestSchemaVersion, nullptr);
 
   nsRefPtr<CacheStorageDBConnection> ref =
-    new CacheStorageDBConnection(conn.forget());
+    new CacheStorageDBConnection(aListener, conn.forget());
   return ref.forget();
 }
 
