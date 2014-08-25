@@ -9,6 +9,7 @@
 #include "mozilla/Attributes.h"
 #include "nsContainerFrame.h"
 #include "nsIAnonymousContentCreator.h"
+#include "nsIContent.h"
 #include "nsITextControlFrame.h"
 #include "nsITextControlElement.h"
 #include "nsIStatefulFrame.h"
@@ -23,10 +24,10 @@ class Element;
 }
 }
 
-class nsTextControlFrame : public nsContainerFrame,
-                           public nsIAnonymousContentCreator,
-                           public nsITextControlFrame,
-                           public nsIStatefulFrame
+class nsTextControlFrame MOZ_FINAL : public nsContainerFrame,
+                                     public nsIAnonymousContentCreator,
+                                     public nsITextControlFrame,
+                                     public nsIStatefulFrame
 {
 public:
   NS_DECL_FRAMEARENA_HELPERS

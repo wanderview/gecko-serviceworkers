@@ -481,6 +481,11 @@ class MochitestUtilsMixin(object):
         repeat -- How many times to repeat the test, ie: repeat=1 will run the test twice.
     """
 
+    if not hasattr(options, 'logFile'):
+        options.logFile = ""
+    if not hasattr(options, 'fileLevel'):
+        options.fileLevel = 'INFO'
+
     # allow relative paths for logFile
     if options.logFile:
       options.logFile = self.getLogFilePath(options.logFile)
@@ -1157,6 +1162,9 @@ class Mochitest(MochitestUtilsMixin):
     return manifest
 
   def getGMPPluginPath(self, options):
+    if options.gmp_path:
+      return options.gmp_path
+
     # For local builds, gmp-fake will be under dist/bin.
     gmp_path = os.path.join(options.xrePath, 'gmp-fake')
     if os.path.isdir(gmp_path):

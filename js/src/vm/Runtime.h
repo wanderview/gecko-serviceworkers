@@ -381,6 +381,8 @@ struct RegExpTestCache
  */
 class FreeOp : public JSFreeOp
 {
+    Vector<void *, 0, SystemAllocPolicy> freeLaterList;
+
   public:
     static FreeOp *get(JSFreeOp *fop) {
         return static_cast<FreeOp *>(fop);
@@ -390,7 +392,13 @@ class FreeOp : public JSFreeOp
       : JSFreeOp(rt)
     {}
 
+    ~FreeOp() {
+        for (size_t i = 0; i < freeLaterList.length(); i++)
+            free_(freeLaterList[i]);
+    }
+
     inline void free_(void *p);
+    inline void freeLater(void *p);
 
     template <class T>
     inline void delete_(T *p) {
@@ -1385,18 +1393,28 @@ struct JSRuntime : public JS::shadow::Runtime,
 
     static const unsigned LARGE_ALLOCATION = 25 * 1024 * 1024;
 
-    void *callocCanGC(size_t bytes) {
-        void *p = (void *)pod_calloc<uint8_t>(bytes);
+    template <typename T>
+    T *pod_callocCanGC(size_t numElems) {
+        T *p = pod_calloc<T>(numElems);
         if (MOZ_LIKELY(!!p))
             return p;
-        return onOutOfMemoryCanGC(reinterpret_cast<void *>(1), bytes);
+        if (numElems & mozilla::tl::MulOverflowMask<sizeof(T)>::value) {
+            reportAllocationOverflow();
+            return nullptr;
+        }
+        return (T *)onOutOfMemoryCanGC(reinterpret_cast<void *>(1), numElems * sizeof(T));
     }
 
-    void *reallocCanGC(void *p, size_t bytes) {
-        void *p2 = realloc_(p, bytes);
+    template <typename T>
+    T *pod_reallocCanGC(T *p, size_t oldSize, size_t newSize) {
+        T *p2 = pod_realloc<T>(p, oldSize, newSize);
         if (MOZ_LIKELY(!!p2))
             return p2;
-        return onOutOfMemoryCanGC(p, bytes);
+        if (newSize & mozilla::tl::MulOverflowMask<sizeof(T)>::value) {
+            reportAllocationOverflow();
+            return nullptr;
+        }
+        return (T *)onOutOfMemoryCanGC(p, newSize * sizeof(T));
     }
 };
 
@@ -1461,6 +1479,17 @@ inline void
 FreeOp::free_(void *p)
 {
     js_free(p);
+}
+
+inline void
+FreeOp::freeLater(void *p)
+{
+    // FreeOps other than the defaultFreeOp() are constructed on the stack,
+    // and won't hold onto the pointers to free indefinitely.
+    JS_ASSERT(this != runtime()->defaultFreeOp());
+
+    if (!freeLaterList.append(p))
+        CrashAtUnhandlableOOM("FreeOp::freeLater");
 }
 
 class AutoLockGC
@@ -1676,7 +1705,11 @@ class RuntimeAllocPolicy
         return runtime->pod_calloc<T>(numElems);
     }
 
-    void *realloc_(void *p, size_t bytes) { return runtime->realloc_(p, bytes); }
+    template <typename T>
+    T *pod_realloc(T *p, size_t oldSize, size_t newSize) {
+        return runtime->pod_realloc<T>(p, oldSize, newSize);
+    }
+
     void free_(void *p) { js_free(p); }
     void reportAllocOverflow() const {}
 };

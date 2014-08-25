@@ -1090,6 +1090,28 @@ public:
 #endif
 
 #ifdef ENABLE_TESTS
+  class TestPBackgroundCreateCallback MOZ_FINAL :
+    public nsIIPCBackgroundChildCreateCallback
+  {
+  public:
+    virtual void ActorCreated(PBackgroundChild* actor) MOZ_OVERRIDE
+    {
+      MOZ_RELEASE_ASSERT(actor);
+    }
+
+    virtual void ActorFailed() MOZ_OVERRIDE
+    {
+      MOZ_CRASH("TestPBackground() should not fail GetOrCreateForCurrentThread()");
+    }
+
+  private:
+    ~TestPBackgroundCreateCallback()
+    { }
+
+  public:
+    NS_DECL_ISUPPORTS;
+  };
+
   void
   TestPBackground()
   {
@@ -1123,6 +1145,11 @@ private:
   ~WorkerThread()
   { }
 };
+
+#ifdef ENABLE_TESTS
+NS_IMPL_ISUPPORTS(RuntimeService::WorkerThread::TestPBackgroundCreateCallback,
+                  nsIIPCBackgroundChildCreateCallback);
+#endif
 
 BEGIN_WORKERS_NAMESPACE
 
@@ -2713,11 +2740,11 @@ WorkerThreadPrimaryRunnable::Run()
     return rv;
   }
 
+  mThread->SetWorker(mWorkerPrivate);
+
 #ifdef ENABLE_TESTS
   mThread->TestPBackground();
 #endif
-
-  mThread->SetWorker(mWorkerPrivate);
 
   mWorkerPrivate->AssertIsOnWorkerThread();
 
