@@ -49,7 +49,7 @@ public:
   // binding methods
   static bool PrefEnabled(JSContext* aCx, JSObject* aObj);
 
-  virtual nsISupports* GetParentObject() const MOZ_OVERRIDE;
+  virtual nsISupports* GetParentObject() const;
   virtual JSObject* WrapObject(JSContext* aContext) MOZ_OVERRIDE;
 
   // nsIIPCbackgroundChildCreateCallback methods
