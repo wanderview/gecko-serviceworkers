@@ -23,8 +23,8 @@ using mozilla::ipc::BackgroundChild;
 using mozilla::ipc::PBackgroundChild;
 using mozilla::ipc::IProtocol;
 
-NS_IMPL_CYCLE_COLLECTING_ADDREF(CacheStorage);
-NS_IMPL_CYCLE_COLLECTING_RELEASE(CacheStorage);
+NS_IMPL_CYCLE_COLLECTING_ADDREF(mozilla::dom::CacheStorage);
+NS_IMPL_CYCLE_COLLECTING_RELEASE(mozilla::dom::CacheStorage);
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(CacheStorage, mOwner,
                                                     mGlobal,
                                                     mRequestPromises)
