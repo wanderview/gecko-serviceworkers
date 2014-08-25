@@ -9,6 +9,7 @@
 #include "mozilla/dom/CacheStorageChildListener.h"
 
 using mozilla::dom::CacheStorageChild;
+using mozilla::dom::cache::RequestId;
 
 CacheStorageChild::CacheStorageChild(CacheStorageChildListener& aListener)
   : mListener(&aListener)
@@ -31,7 +32,7 @@ CacheStorageChild::ActorDestroy(ActorDestroyReason aReason)
 }
 
 bool
-CacheStorageChild::RecvGetResponse(const uintptr_t& aRequestId,
+CacheStorageChild::RecvGetResponse(const RequestId& aRequestId,
                                    PCacheChild* aActor)
 {
   MOZ_ASSERT(mListener);
@@ -40,7 +41,7 @@ CacheStorageChild::RecvGetResponse(const uintptr_t& aRequestId,
 }
 
 bool
-CacheStorageChild::RecvHasResponse(const uintptr_t& aRequestId,
+CacheStorageChild::RecvHasResponse(const RequestId& aRequestId,
                                    const bool& aResult)
 {
   MOZ_ASSERT(mListener);
@@ -49,7 +50,7 @@ CacheStorageChild::RecvHasResponse(const uintptr_t& aRequestId,
 }
 
 bool
-CacheStorageChild::RecvCreateResponse(const uintptr_t& aRequestId,
+CacheStorageChild::RecvCreateResponse(const RequestId& aRequestId,
                                       PCacheChild* aActor)
 {
   MOZ_ASSERT(mListener);
@@ -58,7 +59,7 @@ CacheStorageChild::RecvCreateResponse(const uintptr_t& aRequestId,
 }
 
 bool
-CacheStorageChild::RecvDeleteResponse(const uintptr_t& aRequestId,
+CacheStorageChild::RecvDeleteResponse(const RequestId& aRequestId,
                                       const bool& aResult)
 {
   MOZ_ASSERT(mListener);
@@ -67,7 +68,7 @@ CacheStorageChild::RecvDeleteResponse(const uintptr_t& aRequestId,
 }
 
 bool
-CacheStorageChild::RecvKeysResponse(const uintptr_t& aRequestId,
+CacheStorageChild::RecvKeysResponse(const RequestId& aRequestId,
                                     const nsTArray<nsString>& aKeys)
 {
   MOZ_ASSERT(mListener);

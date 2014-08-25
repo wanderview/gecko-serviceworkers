@@ -16,6 +16,7 @@ EXPORTS.mozilla.dom += [
     'CacheStorageDBListener.h',
     'CacheStorageManager.h',
     'CacheStorageParent.h',
+    'CacheTypes.h',
 ]
 
 UNIFIED_SOURCES += [

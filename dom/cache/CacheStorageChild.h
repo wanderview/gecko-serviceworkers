@@ -7,6 +7,7 @@
 #ifndef mozilla_dom_cache_CacheStorageChild_h
 #define mozilla_dom_cache_CacheStorageChild_h
 
+#include "mozilla/dom/CacheTypes.h"
 #include "mozilla/dom/PCacheStorageChild.h"
 
 namespace mozilla {
@@ -21,15 +22,15 @@ public:
   CacheStorageChild(CacheStorageChildListener& aListener);
   virtual ~CacheStorageChild();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
-  virtual bool RecvGetResponse(const uintptr_t& aRequestId,
+  virtual bool RecvGetResponse(const cache::RequestId& aRequestId,
                                PCacheChild* aActor) MOZ_OVERRIDE;
-  virtual bool RecvHasResponse(const uintptr_t& aRequestId,
+  virtual bool RecvHasResponse(const cache::RequestId& aRequestId,
                                const bool& aResult) MOZ_OVERRIDE;
-  virtual bool RecvCreateResponse(const uintptr_t& aRequestId,
+  virtual bool RecvCreateResponse(const cache::RequestId& aRequestId,
                                   PCacheChild* aActor) MOZ_OVERRIDE;
-  virtual bool RecvDeleteResponse(const uintptr_t& aRequestId,
+  virtual bool RecvDeleteResponse(const cache::RequestId& aRequestId,
                                   const bool& aResult) MOZ_OVERRIDE;
-  virtual bool RecvKeysResponse(const uintptr_t& aRequestId,
+  virtual bool RecvKeysResponse(const cache::RequestId& aRequestId,
                                 const nsTArray<nsString>& aKeys) MOZ_OVERRIDE;
 
   void ClearListener();

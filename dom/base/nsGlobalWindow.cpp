@@ -10744,7 +10744,9 @@ nsGlobalWindow::Caches()
       origin.AssignLiteral("null");
       baseDomain.AssignLiteral("");
     }
-    mCacheStorage = new CacheStorage(ToSupports(this), this, origin, baseDomain);
+    mCacheStorage = new CacheStorage(cache::DEFAULT_NAMESPACE,
+                                     ToSupports(this), this, origin,
+                                     baseDomain);
   }
 
   nsRefPtr<CacheStorage> ref = mCacheStorage;

@@ -99,7 +99,8 @@ BackgroundChildImpl::DeallocPBackgroundTestChild(PBackgroundTestChild* aActor)
 }
 
 PCacheStorageChild*
-BackgroundChildImpl::AllocPCacheStorageChild(const nsCString& aOrigin,
+BackgroundChildImpl::AllocPCacheStorageChild(const uint8_t& aNamespaceEnum,
+                                             const nsCString& aOrigin,
                                              const nsCString& aBaseDomain)
 {
   MOZ_CRASH("CacheStorageChild actor must be provided to PBackground manager");

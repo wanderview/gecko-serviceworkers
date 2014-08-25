@@ -15,9 +15,13 @@
 namespace mozilla {
 namespace dom {
 
-CacheStorageParent::CacheStorageParent(const nsACString& aOrigin,
+using mozilla::dom::cache::RequestId;
+
+CacheStorageParent::CacheStorageParent(cache::Namespace aNamespace,
+                                       const nsACString& aOrigin,
                                        const nsACString& aBaseDomain)
-  : mOrigin(aOrigin)
+  : mNamespace(aNamespace)
+  , mOrigin(aOrigin)
   , mBaseDomain(aBaseDomain)
   , mCacheStorageManager(CacheStorageManager::GetInstance())
 {
@@ -36,7 +40,7 @@ CacheStorageParent::ActorDestroy(ActorDestroyReason aReason)
 }
 
 bool
-CacheStorageParent::RecvGet(const uintptr_t& aRequestId, const nsString& aKey)
+CacheStorageParent::RecvGet(const RequestId& aRequestId, const nsString& aKey)
 {
   CacheStorageDBConnection *conn = GetDBConnection();
   if (!conn) {
@@ -52,7 +56,7 @@ CacheStorageParent::RecvGet(const uintptr_t& aRequestId, const nsString& aKey)
 }
 
 bool
-CacheStorageParent::RecvHas(const uintptr_t& aRequestId, const nsString& aKey)
+CacheStorageParent::RecvHas(const RequestId& aRequestId, const nsString& aKey)
 {
   CacheStorageDBConnection *conn = GetDBConnection();
   if (!conn) {
@@ -68,7 +72,8 @@ CacheStorageParent::RecvHas(const uintptr_t& aRequestId, const nsString& aKey)
 }
 
 bool
-CacheStorageParent::RecvCreate(const uintptr_t& aRequestId, const nsString& aKey)
+CacheStorageParent::RecvCreate(const RequestId& aRequestId,
+                               const nsString& aKey)
 {
   CacheStorageDBConnection *conn = GetOrCreateDBConnection();
   if (NS_WARN_IF(!conn)) {
@@ -89,7 +94,8 @@ CacheStorageParent::RecvCreate(const uintptr_t& aRequestId, const nsString& aKey
 }
 
 bool
-CacheStorageParent::RecvDelete(const uintptr_t& aRequestId, const nsString& aKey)
+CacheStorageParent::RecvDelete(const RequestId& aRequestId,
+                               const nsString& aKey)
 {
   CacheStorageDBConnection *conn = GetDBConnection();
   if (!conn) {
@@ -105,7 +111,7 @@ CacheStorageParent::RecvDelete(const uintptr_t& aRequestId, const nsString& aKey
 }
 
 bool
-CacheStorageParent::RecvKeys(const uintptr_t& aRequestId)
+CacheStorageParent::RecvKeys(const RequestId& aRequestId)
 {
   CacheStorageDBConnection *conn = GetDBConnection();
   if (!conn) {
@@ -121,7 +127,7 @@ CacheStorageParent::RecvKeys(const uintptr_t& aRequestId)
 }
 
 void
-CacheStorageParent::OnGet(uintptr_t aRequestId, const nsID& aCacheId)
+CacheStorageParent::OnGet(RequestId aRequestId, const nsID& aCacheId)
 {
   CacheParent* actor = new CacheParent();
   if (actor) {
@@ -131,13 +137,13 @@ CacheStorageParent::OnGet(uintptr_t aRequestId, const nsID& aCacheId)
 }
 
 void
-CacheStorageParent::OnHas(uintptr_t aRequestId, bool aResult)
+CacheStorageParent::OnHas(RequestId aRequestId, bool aResult)
 {
   unused << SendHasResponse(aRequestId, aResult);
 }
 
 void
-CacheStorageParent::OnPut(uintptr_t aRequestId, bool aResult)
+CacheStorageParent::OnPut(RequestId aRequestId, bool aResult)
 {
   CacheParent* actor = nullptr;
   if (aResult) {
@@ -149,13 +155,14 @@ CacheStorageParent::OnPut(uintptr_t aRequestId, bool aResult)
 }
 
 void
-CacheStorageParent::OnDelete(uintptr_t aRequestId, bool aResult)
+CacheStorageParent::OnDelete(RequestId aRequestId, bool aResult)
 {
   unused << SendDeleteResponse(aRequestId, aResult);
 }
 
 void
-CacheStorageParent::OnKeys(uintptr_t aRequestId, const nsTArray<nsString>& aKeys)
+CacheStorageParent::OnKeys(RequestId aRequestId,
+                           const nsTArray<nsString>& aKeys)
 {
   unused << SendKeysResponse(aRequestId, aKeys);
 }
@@ -165,7 +172,8 @@ CacheStorageDBConnection*
 CacheStorageParent::GetDBConnection()
 {
   if (!mDBConnection) {
-    mDBConnection = CacheStorageDBConnection::Get(*this, mOrigin, mBaseDomain);
+    mDBConnection = CacheStorageDBConnection::Get(*this, mNamespace, mOrigin,
+                                                  mBaseDomain);
   }
 
   return mDBConnection;
@@ -175,7 +183,8 @@ CacheStorageDBConnection*
 CacheStorageParent::GetOrCreateDBConnection()
 {
   if (!mDBConnection) {
-    mDBConnection = CacheStorageDBConnection::GetOrCreate(*this, mOrigin, mBaseDomain);
+    mDBConnection = CacheStorageDBConnection::GetOrCreate(*this, mNamespace,
+                                                          mOrigin, mBaseDomain);
   }
 
   return mDBConnection;

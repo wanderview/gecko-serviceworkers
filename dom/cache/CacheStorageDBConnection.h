@@ -7,6 +7,7 @@
 #ifndef mozilla_dom_cache_CacheStorageDBConnection_h
 #define mozilla_dom_cache_CacheStorageDBConnection_h
 
+#include "mozilla/dom/CacheTypes.h"
 #include "nsCOMPtr.h"
 #include "nsISupportsImpl.h"
 
@@ -22,32 +23,35 @@ class CacheStorageDBConnection MOZ_FINAL
 {
 public:
   static already_AddRefed<CacheStorageDBConnection>
-  Get(CacheStorageDBListener& aListener,
+  Get(CacheStorageDBListener& aListener, cache::Namespace aNamespace,
       const nsACString& aOrigin, const nsACString& aBaseDomain);
 
   static already_AddRefed<CacheStorageDBConnection>
-  GetOrCreate(CacheStorageDBListener& aListener,
+  GetOrCreate(CacheStorageDBListener& aListener, cache::Namespace aNamespace,
               const nsACString& aOrigin, const nsACString& aBaseDomain);
 
-  nsresult Get(uintptr_t aRequestId, const nsAString& aKey);
-  nsresult Has(uintptr_t aRequestId, const nsAString& aKey);
-  nsresult Put(uintptr_t aRequestId, const nsAString& aKey, const nsID& aCacheId);
-  nsresult Delete(uintptr_t aRequestId, const nsAString& aKey);
-  nsresult Keys(uintptr_t aRequestId);
+  nsresult Get(cache::RequestId aRequestId, const nsAString& aKey);
+  nsresult Has(cache::RequestId aRequestId, const nsAString& aKey);
+  nsresult Put(cache::RequestId aRequestId, const nsAString& aKey,
+               const nsID& aCacheId);
+  nsresult Delete(cache::RequestId aRequestId, const nsAString& aKey);
+  nsresult Keys(cache::RequestId aRequestId);
 
 private:
   CacheStorageDBConnection(CacheStorageDBListener& aListener,
+                           cache::Namespace aNamespace,
                            already_AddRefed<mozIStorageConnection> aConnection);
   ~CacheStorageDBConnection();
 
   static already_AddRefed<CacheStorageDBConnection>
   GetOrCreateInternal(CacheStorageDBListener& aListener,
-                      const nsACString& aOrigin, const nsACString& aBaseDomain,
-                      bool allowCreate);
+                      cache::Namespace aNamespace, const nsACString& aOrigin,
+                      const nsACString& aBaseDomain, bool allowCreate);
 
   static const int32_t kLatestSchemaVersion = 1;
 
   CacheStorageDBListener& mListener;
+  const cache::Namespace mNamespace;
   nsCOMPtr<mozIStorageConnection> mConnection;
 
 public:

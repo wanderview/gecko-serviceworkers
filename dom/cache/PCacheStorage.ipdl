@@ -5,6 +5,8 @@
 include protocol PBackground;
 include protocol PCache;
 
+using mozilla::dom::cache::RequestId from "mozilla/dom/CacheTypes.h";
+
 namespace mozilla {
 namespace dom {
 
@@ -13,18 +15,18 @@ protocol PCacheStorage
   manager PBackground;
 
 parent:
-  Get(uintptr_t aRequestId, nsString aKey);
-  Has(uintptr_t aRequestId, nsString aKey);
-  Create(uintptr_t aRequestId, nsString aKey);
-  Delete(uintptr_t aRequestId, nsString aKey);
-  Keys(uintptr_t aRequestId);
+  Get(RequestId aRequestId, nsString aKey);
+  Has(RequestId aRequestId, nsString aKey);
+  Create(RequestId aRequestId, nsString aKey);
+  Delete(RequestId aRequestId, nsString aKey);
+  Keys(RequestId aRequestId);
 
 child:
-  GetResponse(uintptr_t aRequestId, nullable PCache aActor);
-  HasResponse(uintptr_t aRequestId, bool aResult);
-  CreateResponse(uintptr_t aRequestId, nullable PCache aActor);
-  DeleteResponse(uintptr_t aRequestId, bool aResult);
-  KeysResponse(uintptr_t aRequestId, nsString[] aKeys);
+  GetResponse(RequestId aRequestId, nullable PCache aActor);
+  HasResponse(RequestId aRequestId, bool aResult);
+  CreateResponse(RequestId aRequestId, nullable PCache aActor);
+  DeleteResponse(RequestId aRequestId, bool aResult);
+  KeysResponse(RequestId aRequestId, nsString[] aKeys);
 
 both:
   __delete__();

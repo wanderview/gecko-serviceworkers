@@ -19,6 +19,8 @@ namespace dom {
 
 using mozilla::unused;
 using mozilla::ErrorResult;
+using mozilla::dom::cache::INVALID_REQUEST_ID;
+using mozilla::dom::cache::RequestId;
 using mozilla::ipc::BackgroundChild;
 using mozilla::ipc::PBackgroundChild;
 using mozilla::ipc::IProtocol;
@@ -35,10 +37,13 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(CacheStorage)
   NS_INTERFACE_MAP_ENTRY(nsIIPCBackgroundChildCreateCallback)
 NS_INTERFACE_MAP_END
 
-CacheStorage::CacheStorage(nsISupports* aOwner, nsIGlobalObject* aGlobal,
+CacheStorage::CacheStorage(cache::Namespace aNamespace,
+                           nsISupports* aOwner,
+                           nsIGlobalObject* aGlobal,
                            const nsACString& aOrigin,
                            const nsACString& aBaseDomain)
-  : mOwner(aOwner)
+  : mNamespace(aNamespace)
+  , mOwner(aOwner)
   , mGlobal(aGlobal)
   , mOrigin(aOrigin)
   , mBaseDomain(aBaseDomain)
@@ -202,7 +207,8 @@ CacheStorage::ActorCreated(PBackgroundChild* aActor)
   }
 
   PCacheStorageChild* constructedActor =
-    aActor->SendPCacheStorageConstructor(newActor, mOrigin, mBaseDomain);
+    aActor->SendPCacheStorageConstructor(newActor, mNamespace, mOrigin,
+                                         mBaseDomain);
 
   if (NS_WARN_IF(!constructedActor)) {
     ActorFailed();
@@ -251,7 +257,7 @@ CacheStorage::RecvGetResponse(uint64_t aRequestId, PCacheChild* aActor)
 }
 
 void
-CacheStorage::RecvHasResponse(uintptr_t aRequestId, bool aResult)
+CacheStorage::RecvHasResponse(RequestId aRequestId, bool aResult)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
@@ -281,7 +287,7 @@ CacheStorage::RecvCreateResponse(uint64_t aRequestId, PCacheChild* aActor)
 }
 
 void
-CacheStorage::RecvDeleteResponse(uintptr_t aRequestId, bool aResult)
+CacheStorage::RecvDeleteResponse(RequestId aRequestId, bool aResult)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
@@ -291,7 +297,7 @@ CacheStorage::RecvDeleteResponse(uintptr_t aRequestId, bool aResult)
 }
 
 void
-CacheStorage::RecvKeysResponse(const uintptr_t& aRequestId,
+CacheStorage::RecvKeysResponse(const RequestId& aRequestId,
                                const nsTArray<nsString>& aKeys)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
@@ -311,7 +317,7 @@ CacheStorage::~CacheStorage()
   }
 }
 
-CacheStorage::RequestId
+RequestId
 CacheStorage::AddRequestPromise(Promise* aPromise, ErrorResult& aRv)
 {
   MOZ_ASSERT(aPromise);

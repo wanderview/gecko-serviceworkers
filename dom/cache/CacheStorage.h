@@ -8,6 +8,7 @@
 #define mozilla_dom_CacheStorage_h
 
 #include "mozilla/dom/CacheStorageChildListener.h"
+#include "mozilla/dom/CacheTypes.h"
 #include "nsISupportsImpl.h"
 #include "nsWrapperCache.h"
 #include "nsIIPCBackgroundChildCreateCallback.h"
@@ -34,8 +35,9 @@ class CacheStorage MOZ_FINAL : public nsIIPCBackgroundChildCreateCallback
   typedef mozilla::ipc::PBackgroundChild PBackgroundChild;
 
 public:
-  CacheStorage(nsISupports* aOwner, nsIGlobalObject* aGlobal,
-               const nsACString& aOrigin, const nsACString& aBaseDomain);
+  CacheStorage(cache::Namespace aNamespace, nsISupports* aOwner,
+               nsIGlobalObject* aGlobal, const nsACString& aOrigin,
+               const nsACString& aBaseDomain);
 
   // webidl interface methods
   already_AddRefed<Promise> Match(const RequestOrScalarValueString& aRequest,
@@ -58,25 +60,23 @@ public:
 
   // CacheStorageChildListener methods
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
-  virtual void RecvGetResponse(uintptr_t aRequestId,
+  virtual void RecvGetResponse(cache::RequestId aRequestId,
                                PCacheChild* aActor) MOZ_OVERRIDE;
-  virtual void RecvHasResponse(uintptr_t aRequestId, bool aResult) MOZ_OVERRIDE;
-  virtual void RecvCreateResponse(uintptr_t aRequestId,
+  virtual void RecvHasResponse(cache::RequestId aRequestId, bool aResult) MOZ_OVERRIDE;
+  virtual void RecvCreateResponse(cache::RequestId aRequestId,
                                   PCacheChild* aActor) MOZ_OVERRIDE;
-  virtual void RecvDeleteResponse(uintptr_t aRequestId,
+  virtual void RecvDeleteResponse(cache::RequestId aRequestId,
                                   bool aResult) MOZ_OVERRIDE;
-  virtual void RecvKeysResponse(const uintptr_t& aRequestId,
+  virtual void RecvKeysResponse(const cache::RequestId& aRequestId,
                                 const nsTArray<nsString>& aKeys) MOZ_OVERRIDE;
 
 private:
   virtual ~CacheStorage();
 
-  typedef uintptr_t RequestId;
-  static const uintptr_t INVALID_REQUEST_ID = 0;
+  cache::RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);
+  already_AddRefed<Promise> RemoveRequestPromise(cache::RequestId aRequestId);
 
-  RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);
-  already_AddRefed<Promise> RemoveRequestPromise(RequestId aRequestId);
-
+  const cache::Namespace mNamespace;
   nsCOMPtr<nsISupports> mOwner;
   nsCOMPtr<nsIGlobalObject> mGlobal;
   const nsCString mOrigin;

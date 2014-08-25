@@ -7,6 +7,8 @@
 #ifndef mozilla_dom_CacheStorageChildListener_h
 #define mozilla_dom_CacheStorageChildListener_h
 
+#include "mozilla/dom/CacheTypes.h"
+
 namespace mozilla {
 
 namespace ipc {
@@ -22,11 +24,13 @@ class CacheStorageChildListener
 public:
   virtual ~CacheStorageChildListener() { }
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor)=0;
-  virtual void RecvGetResponse(uintptr_t aRequestId, PCacheChild* aActor)=0;
-  virtual void RecvHasResponse(uintptr_t aRequestId, bool aResult)=0;
-  virtual void RecvCreateResponse(uintptr_t aRequestId, PCacheChild* aActor)=0;
-  virtual void RecvDeleteResponse(uintptr_t aRequestId, bool aResult)=0;
-  virtual void RecvKeysResponse(const uintptr_t& aRequestId,
+  virtual void RecvGetResponse(cache::RequestId aRequestId,
+                               PCacheChild* aActor)=0;
+  virtual void RecvHasResponse(cache::RequestId aRequestId, bool aResult)=0;
+  virtual void RecvCreateResponse(cache::RequestId aRequestId,
+                                  PCacheChild* aActor)=0;
+  virtual void RecvDeleteResponse(cache::RequestId aRequestId, bool aResult)=0;
+  virtual void RecvKeysResponse(const cache::RequestId& aRequestId,
                                 const nsTArray<nsString>& aKeys)=0;
 };
 
