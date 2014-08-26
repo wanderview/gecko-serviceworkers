@@ -11,16 +11,23 @@
 [Exposed=(Window,Worker),
  Func="mozilla::dom::Cache::PrefEnabled"]
 interface Cache {
+  [Throws]
   Promise<Response> match((Request or ScalarValueString) request,
                           optional QueryParams params);
+  [Throws]
   Promise<sequence<Response>> matchAll((Request or ScalarValueString) request,
                                        optional QueryParams params);
+  [Throws]
   Promise<Response> add((Request or ScalarValueString) request);
+  [Throws]
   Promise<sequence<Response>> addAll(sequence<(Request or ScalarValueString)> requests);
+  [Throws]
   Promise<Response> put((Request or ScalarValueString) request,
                         Response response);
+  [Throws]
   Promise<boolean> delete((Request or ScalarValueString) request,
                           optional QueryParams params);
+  [Throws]
   Promise<sequence<Request>> keys(optional (Request or ScalarValueString) request,
                                   optional QueryParams params);
 };

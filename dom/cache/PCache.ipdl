@@ -3,6 +3,11 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 include protocol PBackground;
+include PCacheQueryParams;
+include PCacheRequest;
+include PCacheResponse;
+
+using mozilla::dom::cache::RequestId from "mozilla/dom/CacheTypes.h";
 
 namespace mozilla {
 namespace dom {
@@ -10,6 +15,24 @@ namespace dom {
 protocol PCache
 {
   manager PBackground;
+
+parent:
+  Match(RequestId requestId, PCacheRequest request, PCacheQueryParams params);
+  MatchAll(RequestId requestId, PCacheRequest request, PCacheQueryParams params);
+  Add(RequestId requestId, PCacheRequest request);
+  AddAll(RequestId requestId, PCacheRequest[] requests);
+  Put(RequestId requestId, PCacheRequest request, PCacheResponse response);
+  Delete(RequestId requestId, PCacheRequest request, PCacheQueryParams params);
+  Keys(RequestId requestId, PCacheRequest request, PCacheQueryParams params);
+
+child:
+  MatchResponse(RequestId requestId, PCacheResponse response);
+  MatchAllResponse(RequestId requestId, PCacheResponse[] responses);
+  AddResponse(RequestId requestId, PCacheResponse response);
+  AddAllResponse(RequestId requestId, PCacheResponse[] responses);
+  PutResponse(RequestId requestId, PCacheResponse response);
+  DeleteResponse(RequestId requestId, bool result);
+  KeysResponse(RequestId requestId, PCacheRequest[] requests);
 
 both:
   __delete__();

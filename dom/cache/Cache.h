@@ -12,7 +12,12 @@
 #include "nsISupportsImpl.h"
 #include "nsWrapperCache.h"
 
+class nsIGlobalObject;
+
 namespace mozilla {
+
+class ErrorResult;
+
 namespace dom {
 
 class CacheChild;
@@ -30,21 +35,29 @@ class Cache MOZ_FINAL : public nsISupports
                       , public CacheChildListener
 {
 public:
-  Cache(nsISupports* aOwner, PCacheChild* aActor);
+  Cache(nsISupports* aOwner, nsIGlobalObject* aGlobal, PCacheChild* aActor);
 
   // webidl interface methods
-  already_AddRefed<Promise> Match(const RequestOrScalarValueString& aRequest,
-                                  const QueryParams& aParams);
-  already_AddRefed<Promise> MatchAll(const RequestOrScalarValueString& aRequest,
-                                     const QueryParams& aParams);
-  already_AddRefed<Promise> Add(const RequestOrScalarValueString& aRequest);
-  already_AddRefed<Promise> AddAll(const Sequence<OwningRequestOrScalarValueString>& aRequests);
-  already_AddRefed<Promise> Put(const RequestOrScalarValueString& aRequest,
-                                const Response& aResponse);
-  already_AddRefed<Promise> Delete(const RequestOrScalarValueString& aRequest,
-                                   const QueryParams& aParams);
-  already_AddRefed<Promise> Keys(const Optional<RequestOrScalarValueString>& aRequest,
-                                 const QueryParams& aParams);
+  already_AddRefed<Promise>
+  Match(const RequestOrScalarValueString& aRequest, const QueryParams& aParams,
+        ErrorResult& aRv);
+  already_AddRefed<Promise>
+  MatchAll(const RequestOrScalarValueString& aRequest,
+           const QueryParams& aParams, ErrorResult& aRv);
+  already_AddRefed<Promise>
+  Add(const RequestOrScalarValueString& aRequest, ErrorResult& aRv);
+  already_AddRefed<Promise>
+  AddAll(const Sequence<OwningRequestOrScalarValueString>& aRequests,
+         ErrorResult& aRv);
+  already_AddRefed<Promise>
+  Put(const RequestOrScalarValueString& aRequest, const Response& aResponse,
+      ErrorResult& aRv);
+  already_AddRefed<Promise>
+  Delete(const RequestOrScalarValueString& aRequest, const QueryParams& aParams,
+         ErrorResult& aRv);
+  already_AddRefed<Promise>
+  Keys(const Optional<RequestOrScalarValueString>& aRequest,
+       const QueryParams& aParams, ErrorResult& aRv);
 
   // binding methods
   static bool PrefEnabled(JSContext* aCx, JSObject* aObj);
@@ -54,13 +67,38 @@ public:
 
   // CacheChildListener methods
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
+  virtual void
+  RecvMatchResponse(cache::RequestId requestId,
+                    const PCacheResponse& response) MOZ_OVERRIDE;
+  virtual void
+  RecvMatchAllResponse(cache::RequestId requestId,
+                       const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
+  virtual void
+  RecvAddResponse(cache::RequestId requestId,
+                  const PCacheResponse& response) MOZ_OVERRIDE;
+  virtual void
+  RecvAddAllResponse(cache::RequestId requestId,
+                     const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
+  virtual void
+  RecvPutResponse(cache::RequestId requestId,
+                  const PCacheResponse& response) MOZ_OVERRIDE;
+  virtual void
+  RecvDeleteResponse(cache::RequestId requestId, bool result) MOZ_OVERRIDE;
+  virtual void
+  RecvKeysResponse(cache::RequestId requestId,
+                   const nsTArray<PCacheRequest>& requests) MOZ_OVERRIDE;
 
 private:
   virtual ~Cache();
 
+  cache::RequestId AddRequestPromise(Promise* aPromise, ErrorResult& aRv);
+  already_AddRefed<Promise> RemoveRequestPromise(cache::RequestId aRequestId);
+
 private:
   nsCOMPtr<nsISupports> mOwner;
+  nsCOMPtr<nsIGlobalObject> mGlobal;
   CacheChild* mActor;
+  nsTArray<nsRefPtr<Promise>> mRequestPromises;
 
 public:
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS

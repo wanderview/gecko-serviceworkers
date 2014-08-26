@@ -45,5 +45,68 @@ CacheChild::ClearListener()
   mListener = nullptr;
 }
 
+bool
+CacheChild::RecvMatchResponse(const RequestId& requestId,
+                              const PCacheResponse& response)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvMatchResponse(requestId, response);
+  return true;
+}
+
+bool
+CacheChild::RecvMatchAllResponse(const RequestId& requestId,
+                                 const nsTArray<PCacheResponse>& responses)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvMatchAllResponse(requestId, responses);
+  return true;
+}
+
+bool
+CacheChild::RecvAddResponse(const RequestId& requestId,
+                            const PCacheResponse& response)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvAddResponse(requestId, response);
+  return true;
+}
+
+bool
+CacheChild::RecvAddAllResponse(const RequestId& requestId,
+                               const nsTArray<PCacheResponse>& responses)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvAddAllResponse(requestId, responses);
+  return true;
+}
+
+bool
+CacheChild::RecvPutResponse(const RequestId& requestId,
+                            const PCacheResponse& response)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvPutResponse(requestId, response);
+  return true;
+}
+
+bool
+CacheChild::RecvDeleteResponse(const RequestId& requestId,
+                               const bool& result)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvDeleteResponse(requestId, result);
+  return true;
+}
+
+bool
+CacheChild::RecvKeysResponse(const RequestId& requestId,
+                             const nsTArray<PCacheRequest>& requests)
+{
+  MOZ_ASSERT(mListener);
+  mListener->RecvKeysResponse(requestId, requests);
+  return true;
+}
+
 } // namespace dom
 } // namesapce mozilla

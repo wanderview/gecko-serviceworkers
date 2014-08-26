@@ -13,6 +13,7 @@
 #include "mozilla/dom/Promise.h"
 #include "mozilla/ipc/BackgroundChild.h"
 #include "mozilla/ipc/PBackgroundChild.h"
+#include "nsIGlobalObject.h"
 
 namespace mozilla {
 namespace dom {
@@ -252,7 +253,7 @@ CacheStorage::RecvGetResponse(uint64_t aRequestId, PCacheChild* aActor)
     return;
   }
 
-  nsRefPtr<Cache> cache = new Cache(mOwner, aActor);
+  nsRefPtr<Cache> cache = new Cache(mOwner, mGlobal, aActor);
   promise->MaybeResolve(cache);
 }
 
@@ -282,7 +283,7 @@ CacheStorage::RecvCreateResponse(uint64_t aRequestId, PCacheChild* aActor)
     return;
   }
 
-  nsRefPtr<Cache> cache = new Cache(mOwner, aActor);
+  nsRefPtr<Cache> cache = new Cache(mOwner, mGlobal, aActor);
   promise->MaybeResolve(cache);
 }
 

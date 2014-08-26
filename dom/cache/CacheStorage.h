@@ -13,6 +13,8 @@
 #include "nsWrapperCache.h"
 #include "nsIIPCBackgroundChildCreateCallback.h"
 
+class nsIGlobalObject;
+
 namespace mozilla {
 
 class ErrorResult;

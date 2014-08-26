@@ -7,6 +7,9 @@
 #ifndef mozilla_dom_CacheChildListener_h
 #define mozilla_dom_CacheChildListener_h
 
+#include "mozilla/dom/CacheTypes.h"
+#include "nsTArray.h"
+
 namespace mozilla {
 
 namespace ipc {
@@ -15,11 +18,36 @@ namespace ipc {
 
 namespace dom {
 
+class PCacheRequest;
+class PCacheResponse;
+
 class CacheChildListener
 {
 public:
   virtual ~CacheChildListener() { }
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor)=0;
+
+  virtual void
+  RecvMatchResponse(cache::RequestId requestId,
+                    const PCacheResponse& response)=0;
+  virtual void
+  RecvMatchAllResponse(cache::RequestId requestId,
+                       const nsTArray<PCacheResponse>& responses)=0;
+  virtual void
+  RecvAddResponse(cache::RequestId requestId,
+                  const PCacheResponse& response)=0;
+  virtual void
+  RecvAddAllResponse(cache::RequestId requestId,
+                     const nsTArray<PCacheResponse>& responses)=0;
+  virtual void
+  RecvPutResponse(cache::RequestId requestId,
+                  const PCacheResponse& response)=0;
+  virtual void
+  RecvDeleteResponse(cache::RequestId requestId,
+                     bool result)=0;
+  virtual void
+  RecvKeysResponse(cache::RequestId requestId,
+                   const nsTArray<PCacheRequest>& requests)=0;
 };
 
 } // namespace dom

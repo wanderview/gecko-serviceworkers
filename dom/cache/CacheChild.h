@@ -26,6 +26,29 @@ public:
 
   void SetListener(CacheChildListener& aListener);
   void ClearListener();
+
+  // PCacheChild methods
+  virtual bool
+  RecvMatchResponse(const RequestId& requestId,
+                    const PCacheResponse& response) MOZ_OVERRIDE;
+  virtual bool
+  RecvMatchAllResponse(const RequestId& requestId,
+                       const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
+  virtual bool
+  RecvAddResponse(const RequestId& requestId,
+                  const PCacheResponse& response) MOZ_OVERRIDE;
+  virtual bool
+  RecvAddAllResponse(const RequestId& requestId,
+                     const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
+  virtual bool
+  RecvPutResponse(const RequestId& requestId,
+                  const PCacheResponse& response) MOZ_OVERRIDE;
+  virtual bool
+  RecvDeleteResponse(const RequestId& requestId,
+                     const bool& result) MOZ_OVERRIDE;
+  virtual bool
+  RecvKeysResponse(const RequestId& requestId,
+                   const nsTArray<PCacheRequest>& requests) MOZ_OVERRIDE;
 };
 
 } // namespace dom

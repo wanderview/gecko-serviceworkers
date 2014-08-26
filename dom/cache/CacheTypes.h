@@ -7,6 +7,8 @@
 #ifndef mozilla_dom_CacheTypes_h
 #define mozilla_dom_CacheTypes_h
 
+#include <stdint.h>
+
 namespace mozilla {
 namespace dom {
 namespace cache {

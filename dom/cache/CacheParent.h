@@ -20,6 +20,30 @@ public:
   CacheParent();
   virtual ~CacheParent();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
+
+  // PCacheParent method
+  virtual bool
+  RecvMatch(const RequestId& requestId, const PCacheRequest& request,
+            const PCacheQueryParams& params) MOZ_OVERRIDE;
+  virtual bool
+  RecvMatchAll(const RequestId& requestId, const PCacheRequest& request,
+               const PCacheQueryParams& params) MOZ_OVERRIDE;
+  virtual bool
+  RecvAdd(const RequestId& requestId,
+          const PCacheRequest& request) MOZ_OVERRIDE;
+  virtual bool
+  RecvAddAll(const RequestId& requestId,
+             const nsTArray<PCacheRequest>& requests) MOZ_OVERRIDE;
+  virtual bool
+  RecvPut(const RequestId& requestId, const PCacheRequest& request,
+          const PCacheResponse& response) MOZ_OVERRIDE;
+  virtual bool
+  RecvDelete(const RequestId& requestId, const PCacheRequest& request,
+             const PCacheQueryParams& params) MOZ_OVERRIDE;
+  virtual bool
+  RecvKeys(const RequestId& requestId, const PCacheRequest& request,
+           const PCacheQueryParams& params) MOZ_OVERRIDE;
+
 private:
 };
 

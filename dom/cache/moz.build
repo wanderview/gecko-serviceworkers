@@ -32,6 +32,9 @@ UNIFIED_SOURCES += [
 
 IPDL_SOURCES += [
     'PCache.ipdl',
+    'PCacheQueryParams.ipdlh',
+    'PCacheRequest.ipdlh',
+    'PCacheResponse.ipdlh',
     'PCacheStorage.ipdl',
 ]
 
