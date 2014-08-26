@@ -18,6 +18,12 @@ UNIFIED_SOURCES += [
     'Response.cpp',
 ]
 
+IPDL_SOURCES += [
+    'PHeaders.ipdlh',
+]
+
+include('/ipc/chromium/chromium-config.mozbuild')
+
 LOCAL_INCLUDES += [
     '../workers',
 ]
