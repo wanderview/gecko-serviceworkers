@@ -7,6 +7,7 @@
 #ifndef mozilla_dom_CacheTypes_h
 #define mozilla_dom_CacheTypes_h
 
+#include "ipc/IPCMessageUtils.h"
 #include <stdint.h>
 
 namespace mozilla {
@@ -20,17 +21,20 @@ enum Namespace
   NUMBER_OF_NAMESPACES
 };
 
-inline bool
-IsValidNamespace(uint8_t aNamespaceEnum)
-{
-  return aNamespaceEnum < NUMBER_OF_NAMESPACES;
-}
-
 typedef uintptr_t RequestId;
 static const RequestId INVALID_REQUEST_ID = 0;
 
 } // namespace cache
 } // namespace dom
 } // namespace mozilla
+
+namespace IPC {
+  template<>
+  struct ParamTraits<mozilla::dom::cache::Namespace> :
+    public ContiguousEnumSerializer<mozilla::dom::cache::Namespace,
+                                    mozilla::dom::cache::DEFAULT_NAMESPACE,
+                                    mozilla::dom::cache::NUMBER_OF_NAMESPACES>
+  {};
+}
 
 #endif // mozilla_dom_CacheTypes_h

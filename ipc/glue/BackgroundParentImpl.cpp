@@ -18,7 +18,6 @@ using mozilla::dom::CacheStorageParent;
 using mozilla::dom::PCacheStorageParent;
 using mozilla::dom::CacheParent;
 using mozilla::dom::PCacheParent;
-using mozilla::dom::cache::IsValidNamespace;
 using mozilla::dom::cache::Namespace;
 
 namespace {
@@ -117,13 +116,11 @@ BackgroundParentImpl::DeallocPBackgroundTestParent(
 }
 
 PCacheStorageParent*
-BackgroundParentImpl::AllocPCacheStorageParent(const uint8_t& aNamespaceOrigin,
+BackgroundParentImpl::AllocPCacheStorageParent(const Namespace& aNamespace,
                                                const nsCString& aOrigin,
                                                const nsCString& aBaseDomain)
 {
-  MOZ_ASSERT(IsValidNamespace(aNamespaceOrigin));
-  return new CacheStorageParent(static_cast<Namespace>(aNamespaceOrigin),
-                                aOrigin, aBaseDomain);
+  return new CacheStorageParent(aNamespace, aOrigin, aBaseDomain);
 }
 
 bool

@@ -8,11 +8,20 @@
 
 #include "mozilla/dom/ResponseBinding.h"
 #include "mozilla/dom/UnionTypes.h"
+#include "ipc/IPCMessageUtils.h"
 
 #include "nsWrapperCache.h"
 #include "nsISupportsImpl.h"
 
 class nsPIDOMWindow;
+
+namespace IPC {
+  template<>
+  struct ParamTraits<mozilla::dom::ResponseType> :
+    public ContiguousTypedEnumSerializer<mozilla::dom::ResponseType,
+                                         mozilla::dom::ResponseType::Basic,
+                                         mozilla::dom::ResponseType::EndGuard_> {};
+}
 
 namespace mozilla {
 namespace dom {
@@ -41,6 +50,11 @@ public:
   {
     aUrl.AsAString() = mUrl;
   }
+
+// Undo xlib #define brain-damage
+#ifdef Status
+#undef Status
+#endif
 
   uint16_t
   Status() const

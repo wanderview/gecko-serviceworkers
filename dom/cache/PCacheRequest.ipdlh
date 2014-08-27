@@ -4,16 +4,20 @@
 
 include PHeaders;
 
+using RequestCredentials from "mozilla/dom/Request.h";
+using RequestMode from "mozilla/dom/Request.h";
+
 namespace mozilla {
 namespace dom {
 
 struct PCacheRequest
 {
+  bool null;
   nsCString method;
-  nsCString url;
+  nsString url;
   PHeaders headers;
-  uint8_t modeEnum;
-  uint8_t credentialsEnum;
+  RequestMode mode;
+  RequestCredentials credentials;
 };
 
 } // namespace dom

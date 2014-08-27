@@ -4,11 +4,14 @@
 
 include PHeaders;
 
+using mozilla::dom::ResponseType from "mozilla/dom/Response.h";
+
 namespace mozilla {
 namespace dom {
 
 struct PCacheResponse
 {
+  ResponseType type;
   uint32_t status;
   nsCString statusText;
   PHeaders headers;

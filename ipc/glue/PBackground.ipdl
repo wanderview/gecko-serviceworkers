@@ -6,6 +6,8 @@ include protocol PBackgroundTest;
 include protocol PCacheStorage;
 include protocol PCache;
 
+using mozilla::dom::cache::Namespace from "mozilla/dom/CacheTypes.h";
+
 namespace mozilla {
 namespace ipc {
 
@@ -19,7 +21,7 @@ parent:
   // Only called at startup during mochitests to check the basic infrastructure.
   PBackgroundTest(nsCString testArg);
 
-  PCacheStorage(uint8_t namespaceEnum, nsCString origin, nsCString baseDomain);
+  PCacheStorage(Namespace namespaceEnum, nsCString origin, nsCString baseDomain);
 
 both:
   PCache();

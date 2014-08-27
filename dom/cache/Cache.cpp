@@ -8,6 +8,7 @@
 
 #include "mozilla/dom/CacheBinding.h"
 #include "mozilla/dom/CacheChild.h"
+#include "mozilla/dom/Headers.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/ErrorResult.h"
@@ -24,47 +25,97 @@ using mozilla::dom::cache::INVALID_REQUEST_ID;
 using mozilla::dom::cache::RequestId;
 
 static void
+ToPCacheRequest(PCacheRequest& aOut, const Request& aIn)
+{
+  aIn.GetMethod(aOut.method());
+  aIn.GetUrl(aOut.url());
+  nsRefPtr<Headers> headers = aIn.HeadersValue();
+  MOZ_ASSERT(headers);
+  aOut.headers() = headers->AsPHeaders();
+  aOut.mode() = aIn.Mode();
+  aOut.credentials() = aIn.Credentials();
+  aOut.null() = false;
+}
+
+static void
 ToPCacheRequest(PCacheRequest& aOut, const RequestOrScalarValueString& aIn)
 {
-  MOZ_CRASH("implement me");
+  nsRefPtr<Request> request;
+  if (aIn.IsRequest()) {
+    request = &aIn.GetAsRequest();
+  } else {
+    MOZ_ASSERT(aIn.IsScalarValueString());
+    // TODO: see nsIStandardURL.init() if Request does not provide something...
+    MOZ_CRASH("implement me");
+  }
+  ToPCacheRequest(aOut, *request);
 }
 
 static void
 ToPCacheRequest(PCacheRequest& aOut,
                 const Optional<RequestOrScalarValueString>& aIn)
 {
-  MOZ_CRASH("implement me");
+  if (!aIn.WasPassed()) {
+    aOut.null() = true;
+    return;
+  }
+  ToPCacheRequest(aOut, aIn.Value());
 }
 
 static void
 ToPCacheRequest(PCacheRequest& aOut,
                 const OwningRequestOrScalarValueString& aIn)
 {
-  MOZ_CRASH("implement me");
+  nsRefPtr<Request> request;
+  if (aIn.IsRequest()) {
+    request = &static_cast<Request&>(aIn.GetAsRequest());
+  } else {
+    MOZ_ASSERT(aIn.IsScalarValueString());
+    MOZ_CRASH("implement me");
+  }
+  ToPCacheRequest(aOut, *request);
 }
 
 static void
 ToPCacheResponse(PCacheResponse& aOut, const Response& aIn)
 {
-  MOZ_CRASH("implement me");
+  aOut.type() = aIn.Type();
+  aOut.status() = aIn.Status();
+  aIn.GetStatusText(aOut.statusText());
+  nsRefPtr<Headers> headers = aIn.Headers_();
+  MOZ_ASSERT(headers);
+  aOut.headers() = headers->AsPHeaders();
 }
 
 static void
 ToPCacheQueryParams(PCacheQueryParams& aOut, const QueryParams& aIn)
 {
-  MOZ_CRASH("implement me");
+  aOut.ignoreSearch() = aIn.mIgnoreSearch.WasPassed() &&
+                        aIn.mIgnoreSearch.Value();
+  aOut.ignoreMethod() = aIn.mIgnoreMethod.WasPassed() &&
+                        aIn.mIgnoreMethod.Value();
+  aOut.ignoreVary() = aIn.mIgnoreVary.WasPassed() &&
+                      aIn.mIgnoreVary.Value();
+  aOut.prefixMatch() = aIn.mPrefixMatch.WasPassed() &&
+                       aIn.mPrefixMatch.Value();
+  aOut.cacheNameSet() = aIn.mCacheName.WasPassed();
+  if (aOut.cacheNameSet()) {
+    aOut.cacheName() = aIn.mCacheName.Value();
+  }
 }
 
 static void
 ToResponse(Response& aOut, const PCacheResponse& aIn)
 {
-  MOZ_CRASH("implement me");
+  // TODO: implement once real Request/Response are available
+  NS_WARNING("Not filling in contents of Response returned from Cache.");
 }
 
 static void
 ToRequest(Request& aOut, const PCacheRequest& aIn)
 {
-  MOZ_CRASH("implement me");
+  // TODO: implement once real Request/Response are available
+  NS_WARNING("Not filling in contents of Request returned from Cache.");
 }
 
 NS_IMPL_CYCLE_COLLECTING_ADDREF(mozilla::dom::Cache);

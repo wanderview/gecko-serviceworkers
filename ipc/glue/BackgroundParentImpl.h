@@ -37,7 +37,7 @@ protected:
   DeallocPBackgroundTestParent(PBackgroundTestParent* aActor) MOZ_OVERRIDE;
 
   virtual mozilla::dom::PCacheStorageParent*
-  AllocPCacheStorageParent(const uint8_t& aNamespaceOrigin,
+  AllocPCacheStorageParent(const Namespace& aNamespace,
                            const nsCString& aOrigin,
                            const nsCString& aBaseDomain) MOZ_OVERRIDE;
 

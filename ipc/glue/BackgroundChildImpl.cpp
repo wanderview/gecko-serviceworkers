@@ -99,7 +99,7 @@ BackgroundChildImpl::DeallocPBackgroundTestChild(PBackgroundTestChild* aActor)
 }
 
 PCacheStorageChild*
-BackgroundChildImpl::AllocPCacheStorageChild(const uint8_t& aNamespaceEnum,
+BackgroundChildImpl::AllocPCacheStorageChild(const Namespace& aNamespace,
                                              const nsCString& aOrigin,
                                              const nsCString& aBaseDomain)
 {
