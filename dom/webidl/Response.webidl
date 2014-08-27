@@ -11,13 +11,11 @@
  Exposed=(Window,Worker),
  Func="mozilla::dom::Response::PrefEnabled"]
 interface Response {
-  // FIXME(nsm): Bug 1025183 ScalarValueString url.
-  static Response redirect(DOMString url, optional unsigned short status = 302);
+  static Response redirect(ScalarValueString url, optional unsigned short status = 302);
 
   readonly attribute ResponseType type;
 
-  // FIXME(nsm): Bug 1025183 readonly attribute ScalarValueString url;
-  readonly attribute DOMString url;
+  readonly attribute ScalarValueString url;
   readonly attribute unsigned short status;
   readonly attribute ByteString statusText;
   readonly attribute Headers headers;

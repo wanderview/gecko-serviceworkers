@@ -32,9 +32,9 @@ public:
   Request(nsISupports* aOwner);
 
   void
-  GetUrl(DOMString& aUrl) const
+  GetUrl(nsAString& aUrl) const
   {
-    aUrl.AsAString() = mUrl;
+    aUrl = mUrl;
   }
 
   void
@@ -66,7 +66,7 @@ public:
   already_AddRefed<FetchBodyStream> Body() const;
 
   static already_AddRefed<Request>
-  Constructor(const GlobalObject& global, const RequestOrString& aInput,
+  Constructor(const GlobalObject& global, const RequestOrScalarValueString& aInput,
               const RequestInit& aInit, ErrorResult& rv);
 
   virtual JSObject*

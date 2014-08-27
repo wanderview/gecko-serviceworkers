@@ -73,7 +73,7 @@ Request::Body() const
 }
 
 /*static*/ already_AddRefed<Request>
-Request::Constructor(const GlobalObject& global, const RequestOrString& aInput,
+Request::Constructor(const GlobalObject& global, const RequestOrScalarValueString& aInput,
                      const RequestInit& aInit, ErrorResult& rv)
 {
   nsRefPtr<Request> request = new Request(global.GetAsSupports());

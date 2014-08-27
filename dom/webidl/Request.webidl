@@ -7,16 +7,14 @@
  * http://fetch.spec.whatwg.org/
  */
 
-// FIXME: Bug 1025183 typedef (Request or ScalarValueString) RequestInfo;
-typedef (Request or DOMString) RequestInfo;
+typedef (Request or ScalarValueString) RequestInfo;
 
 [Constructor(RequestInfo input, optional RequestInit init),
  Exposed=(Window,Worker),
  Func="mozilla::dom::Request::PrefEnabled"]
 interface Request {
   readonly attribute ByteString method;
-  // FIXME: Bug 1025183 attribute ScalarValueString url;
-  readonly attribute DOMString url;
+  readonly attribute ScalarValueString url;
   readonly attribute Headers headers;
 
   readonly attribute FetchBodyStream body;
