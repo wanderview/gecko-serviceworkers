@@ -1053,6 +1053,7 @@ class RuntimeService::WorkerThread MOZ_FINAL : public nsThread
     NS_DECL_NSITHREADOBSERVER
   };
 
+  mozilla::Mutex mWorkerPrivateLock;
   WorkerPrivate* mWorkerPrivate;
   nsRefPtr<Observer> mObserver;
 
@@ -1136,6 +1137,7 @@ public:
 private:
   WorkerThread()
   : nsThread(nsThread::NOT_MAIN_THREAD, WORKER_STACK_SIZE),
+    mWorkerPrivateLock("RuntimeService::WorkerThread::mWorkerPrivateLock"),
     mWorkerPrivate(nullptr)
 #ifdef DEBUG
     , mAcceptingNonWorkerRunnables(true)
@@ -2563,7 +2565,8 @@ RuntimeService::WorkerThread::SetWorker(WorkerPrivate* aWorkerPrivate)
   MOZ_ASSERT_IF(aWorkerPrivate, !mWorkerPrivate);
   MOZ_ASSERT_IF(!aWorkerPrivate, mWorkerPrivate);
 
-  // No need to lock here because mWorkerPrivate is only modified on mThread.
+  // No need to lock here for these checks because mWorkerPrivate is only
+  // modified on mThread.
 
   if (mWorkerPrivate) {
     MOZ_ASSERT(mObserver);
@@ -2574,7 +2577,12 @@ RuntimeService::WorkerThread::SetWorker(WorkerPrivate* aWorkerPrivate)
     mWorkerPrivate->SetThread(nullptr);
   }
 
-  mWorkerPrivate = aWorkerPrivate;
+  // Lock when writing to mWorkerPrivate because WorkerThread::Dispatch()
+  // needs to check it from any thread.
+  {
+    MutexAutoLock lock(mWorkerPrivateLock);
+    mWorkerPrivate = aWorkerPrivate;
+  }
 
   if (mWorkerPrivate) {
     mWorkerPrivate->SetThread(this);
@@ -2627,6 +2635,15 @@ RuntimeService::WorkerThread::Dispatch(nsIRunnable* aRunnable, uint32_t aFlags)
   nsresult rv = nsThread::Dispatch(runnableToDispatch, NS_DISPATCH_NORMAL);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
+  }
+
+  if (PR_GetCurrentThread() != mThread) {
+    // We must lock here because we're checking mWorkerPrivate from a different
+    // thread.
+    MutexAutoLock lock(mWorkerPrivateLock);
+    if (mWorkerPrivate) {
+      mWorkerPrivate->WakeUpEventLoop();
+    }
   }
 
   return NS_OK;

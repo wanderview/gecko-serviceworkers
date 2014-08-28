@@ -1096,6 +1096,8 @@ public:
     return mWorkerScriptExecutedSuccessfully;
   }
 
+  void WakeUpEventLoop();
+
 private:
   WorkerPrivate(JSContext* aCx, WorkerPrivate* aParent,
                 const nsAString& aScriptURL, bool aIsChromeWorker,
