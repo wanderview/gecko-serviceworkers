@@ -29,5 +29,6 @@ interface FetchBodyStream {
  Func="mozilla::dom::Headers::PrefEnabled"]
 interface GlobalFetch {
   // Promise<Response>
+  [Throws]
   Promise<Response> fetch(RequestInfo input, optional RequestInit init);
 };

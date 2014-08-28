@@ -122,7 +122,9 @@ public:
   Dump(const Optional<nsAString>& aString) const;
 
   already_AddRefed<Promise>
-  Fetch(const RequestOrScalarValueString& aInput, const RequestInit& aInit);
+  Fetch(const RequestOrScalarValueString& aInput,
+        const RequestInit& aInit,
+        ErrorResult& aRv);
 
   already_AddRefed<CacheStorage> Caches();
 };

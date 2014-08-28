@@ -295,7 +295,9 @@ WorkerGlobalScope::Dump(const Optional<nsAString>& aString) const
 }
 
 already_AddRefed<Promise>
-WorkerGlobalScope::Fetch(const RequestOrScalarValueString& aInput, const RequestInit& aInit)
+WorkerGlobalScope::Fetch(const RequestOrScalarValueString& aInput,
+                         const RequestInit& aInit,
+                         ErrorResult& aRv)
 {
   return nullptr;
 }

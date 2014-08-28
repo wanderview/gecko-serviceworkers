@@ -13,6 +13,8 @@
 #include "nsWrapperCache.h"
 #include "nsISupportsImpl.h"
 
+#include "InternalRequest.h"
+
 class nsPIDOMWindow;
 
 namespace IPC {
@@ -43,36 +45,37 @@ NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(Request)
 public:
   static bool PrefEnabled(JSContext* cx, JSObject* obj);
 
-  Request(nsISupports* aOwner);
+  Request(nsISupports* aOwner, InternalRequest* aRequest);
 
   void
   GetUrl(nsAString& aUrl) const
   {
-    aUrl = mUrl;
+    aUrl = NS_ConvertUTF8toUTF16(mRequest->mURL);
   }
 
   void
   GetMethod(nsCString& aMethod) const
   {
-    aMethod = mMethod;
+    aMethod = mRequest->mMethod;
   }
 
   RequestMode
   Mode() const
   {
-    return mMode;
+    return mRequest->mMode;
   }
 
   RequestCredentials
   Credentials() const
   {
-    return mCredentials;
+    return mRequest->mCredentialsMode;
   }
 
   void
   GetReferrer(DOMString& aReferrer) const
   {
-    aReferrer.AsAString() = mReferrer;
+    // FIXME(nsm): deal with client referrers.
+    aReferrer.AsAString() = NS_ConvertUTF8toUTF16(mRequest->mReferrerURL);
   }
 
   void GetHeader(const nsAString& header, DOMString& value) const;
@@ -94,18 +97,16 @@ public:
     return mOwner;
   }
 
+  already_AddRefed<InternalRequest>
+  GetInternalRequest();
 private:
   ~Request();
 
   nsISupports* mOwner;
 
-  nsCString mMethod;
-  nsString mUrl;
-  // FIXME(nsm): Headers? Or should they go in InternalRequest?
-  RequestMode mMode;
-  RequestCredentials mCredentials;
-  nsString mReferrer;
+  // Headers?
   nsRefPtr<FetchBodyStream> mBody;
+  nsRefPtr<InternalRequest> mRequest;
 };
 
 } // namespace dom

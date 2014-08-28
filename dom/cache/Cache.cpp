@@ -482,7 +482,9 @@ Cache::RecvKeysResponse(RequestId aRequestId,
   }
   nsTArray<nsRefPtr<Request>> requests;
   for (uint32_t i = 0; i < aRequests.Length(); ++i) {
-    nsRefPtr<Request> request = new Request(mOwner);
+    MOZ_CRASH("not implemented - can't construct new Request()");
+    //nsRefPtr<Request> request = new Request(mOwner);
+    nsRefPtr<Request> request = nullptr;
     if (NS_WARN_IF(!request)) {
       return;
     }

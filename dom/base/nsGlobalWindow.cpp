@@ -189,6 +189,9 @@
 #include "mozilla/dom/indexedDB/IDBFactory.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/quota/QuotaManager.h"
+#include "mozilla/dom/FetchDriver.h"
+#include "mozilla/dom/Request.h"
+#include "mozilla/dom/Response.h"
 
 #include "mozilla/dom/StructuredCloneTags.h"
 
@@ -213,6 +216,7 @@
 #include "mozilla/dom/BrowserElementDictionariesBinding.h"
 #include "mozilla/dom/CacheStorage.h"
 #include "mozilla/dom/Console.h"
+#include "mozilla/dom/Fetch.h"
 #include "mozilla/dom/FunctionBinding.h"
 #include "mozilla/dom/HashChangeEvent.h"
 #include "mozilla/dom/PopStateEvent.h"
@@ -6426,9 +6430,10 @@ nsGlobalWindow::Confirm(const nsAString& aString, bool* aReturn)
 }
 
 already_AddRefed<Promise>
-nsGlobalWindow::Fetch(const RequestOrScalarValueString& aInput, const RequestInit& aInit)
+nsGlobalWindow::Fetch(const RequestOrScalarValueString& aInput,
+                      const RequestInit& aInit, ErrorResult& aRv)
 {
-  return nullptr;
+  return DOMFetch(this, aInput, aInit, aRv);
 }
 
 void

@@ -8,6 +8,7 @@
 
 #include "mozilla/dom/FetchBinding.h"
 
+#include "nsIDOMFile.h"
 #include "nsISupportsImpl.h"
 #include "nsWrapperCache.h"
 
@@ -59,10 +60,17 @@ public:
     return mOwner;
   }
 
+  void
+  SetBlob(nsIDOMBlob* aBlob)
+  {
+    mBlob = aBlob;
+  }
+
 private:
   virtual ~FetchBodyStream();
 
   nsISupports* mOwner;
+  nsCOMPtr<nsIDOMBlob> mBlob;
 };
 
 } // namespace dom
