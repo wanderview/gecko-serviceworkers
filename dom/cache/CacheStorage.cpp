@@ -253,7 +253,8 @@ CacheStorage::RecvGetResponse(uint64_t aRequestId, PCacheChild* aActor)
     return;
   }
 
-  nsRefPtr<Cache> cache = new Cache(mOwner, mGlobal, aActor);
+  nsRefPtr<Cache> cache = new Cache(mOwner, mGlobal, mOrigin, mBaseDomain,
+                                    aActor);
   promise->MaybeResolve(cache);
 }
 
@@ -283,7 +284,8 @@ CacheStorage::RecvCreateResponse(uint64_t aRequestId, PCacheChild* aActor)
     return;
   }
 
-  nsRefPtr<Cache> cache = new Cache(mOwner, mGlobal, aActor);
+  nsRefPtr<Cache> cache = new Cache(mOwner, mGlobal, mOrigin, mBaseDomain,
+                                    aActor);
   promise->MaybeResolve(cache);
 }
 

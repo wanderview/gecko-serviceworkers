@@ -13,8 +13,13 @@ namespace dom {
 
 using mozilla::dom::cache::RequestId;
 
-CacheParent::CacheParent()
+CacheParent::CacheParent(const nsACString& aOrigin,
+                         const nsACString& aBaseDomain)
+  : mOrigin(aOrigin)
+  , mBaseDomain(aBaseDomain)
 {
+  printf_stderr("### ### CacheParent() origin:%s baseDomain:%s\n",
+                mOrigin.get(), mBaseDomain.get());
 }
 
 CacheParent::~CacheParent()

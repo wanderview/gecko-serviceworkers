@@ -45,7 +45,8 @@ protected:
   DeallocPCacheStorageParent(mozilla::dom::PCacheStorageParent* aActor) MOZ_OVERRIDE;
 
   virtual mozilla::dom::PCacheParent*
-  AllocPCacheParent() MOZ_OVERRIDE;
+  AllocPCacheParent(const nsCString& aOrigin,
+                    const nsCString& aBaseDomain) MOZ_OVERRIDE;
 
   virtual bool
   DeallocPCacheParent(mozilla::dom::PCacheParent* aActor) MOZ_OVERRIDE;

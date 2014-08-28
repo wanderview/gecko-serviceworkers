@@ -17,7 +17,7 @@ namespace dom {
 class CacheParent MOZ_FINAL : public PCacheParent
 {
 public:
-  CacheParent();
+  CacheParent(const nsACString& aOrigin, const nsACString& aBaseDomain);
   virtual ~CacheParent();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
 
@@ -45,6 +45,8 @@ public:
            const PCacheQueryParams& params) MOZ_OVERRIDE;
 
 private:
+  const nsCString mOrigin;
+  const nsCString mBaseDomain;
 };
 
 } // namespace dom

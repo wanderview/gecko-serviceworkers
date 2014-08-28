@@ -56,7 +56,6 @@ private:
   const nsCString mOrigin;
   const nsCString mBaseDomain;
   nsRefPtr<CacheStorageDBConnection> mDBConnection;
-  nsRefPtr<CacheStorageManager> mCacheStorageManager;
   nsTArray<nsString> mKeys;
 };
 

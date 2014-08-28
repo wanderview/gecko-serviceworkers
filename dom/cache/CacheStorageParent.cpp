@@ -7,7 +7,6 @@
 #include "mozilla/dom/CacheStorageParent.h"
 
 #include "mozilla/dom/CacheStorageDBConnection.h"
-#include "mozilla/dom/CacheStorageManager.h"
 #include "mozilla/ipc/PBackgroundParent.h"
 #include "mozilla/unused.h"
 #include "nsCOMPtr.h"
@@ -23,9 +22,7 @@ CacheStorageParent::CacheStorageParent(cache::Namespace aNamespace,
   : mNamespace(aNamespace)
   , mOrigin(aOrigin)
   , mBaseDomain(aBaseDomain)
-  , mCacheStorageManager(CacheStorageManager::GetInstance())
 {
-  MOZ_ASSERT(mCacheStorageManager);
 }
 
 CacheStorageParent::~CacheStorageParent()
@@ -129,9 +126,11 @@ CacheStorageParent::RecvKeys(const RequestId& aRequestId)
 void
 CacheStorageParent::OnGet(RequestId aRequestId, const nsID& aCacheId)
 {
-  CacheParent* actor = new CacheParent();
+  CacheParent* actor = new CacheParent(mOrigin, mBaseDomain);
   if (actor) {
-    actor = static_cast<CacheParent*>(Manager()->SendPCacheConstructor(actor));
+    PCacheParent* base = Manager()->SendPCacheConstructor(actor, mOrigin,
+                                                          mBaseDomain);
+    actor = static_cast<CacheParent*>(base);
   }
   unused << SendGetResponse(aRequestId, actor);
 }
@@ -148,8 +147,12 @@ CacheStorageParent::OnPut(RequestId aRequestId, bool aResult)
   CacheParent* actor = nullptr;
   if (aResult) {
     // TODO: retrieve DB-backed actor for uuid generated in RecvCreate()
-    actor = new CacheParent();
-    actor = static_cast<CacheParent*>(Manager()->SendPCacheConstructor(actor));
+    actor = new CacheParent(mOrigin, mBaseDomain);
+    if (actor) {
+      PCacheParent* base = Manager()->SendPCacheConstructor(actor, mOrigin,
+                                                            mBaseDomain);
+      actor = static_cast<CacheParent*>(base);
+    }
   }
   unused << SendCreateResponse(aRequestId, actor);
 }

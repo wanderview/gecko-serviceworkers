@@ -24,7 +24,7 @@ parent:
   PCacheStorage(Namespace namespaceEnum, nsCString origin, nsCString baseDomain);
 
 both:
-  PCache();
+  PCache(nsCString origin, nsCString baseDomain);
 };
 
 } // namespace ipc

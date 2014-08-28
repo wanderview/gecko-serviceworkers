@@ -117,7 +117,8 @@ BackgroundChildImpl::DeallocPCacheStorageChild(PCacheStorageChild* aActor)
 }
 
 PCacheChild*
-BackgroundChildImpl::AllocPCacheChild()
+BackgroundChildImpl::AllocPCacheChild(const nsCString& aOrigin,
+                                      const nsCString& aBaseDomain)
 {
   return new CacheChild();
 }
