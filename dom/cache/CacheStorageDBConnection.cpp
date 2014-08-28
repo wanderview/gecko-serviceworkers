@@ -174,7 +174,7 @@ CacheStorageDBConnection::Keys(RequestId aRequestId)
   nsCOMPtr<mozIStorageStatement> statement;
 
   nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
-    "SELECT key FROM caches WHERE namespace=?1"
+    "SELECT key FROM caches WHERE namespace=?1 ORDER BY rowid"
   ), getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
 
