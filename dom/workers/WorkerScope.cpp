@@ -294,6 +294,12 @@ WorkerGlobalScope::Dump(const Optional<nsAString>& aString) const
   fflush(stdout);
 }
 
+already_AddRefed<Promise>
+WorkerGlobalScope::Fetch(const RequestOrScalarValueString& aInput, const RequestInit& aInit)
+{
+  return nullptr;
+}
+
 DedicatedWorkerGlobalScope::DedicatedWorkerGlobalScope(WorkerPrivate* aWorkerPrivate)
 : WorkerGlobalScope(aWorkerPrivate)
 {

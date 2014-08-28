@@ -23,3 +23,11 @@ interface FetchBodyStream {
   //Promise<ScalarValueString>
   Promise<DOMString> asText();
 };
+
+[NoInterfaceObject,
+ Exposed=(Window,Worker),
+ Func="mozilla::dom::Headers::PrefEnabled"]
+interface GlobalFetch {
+  // Promise<Response>
+  Promise<Response> fetch(RequestInfo input, optional RequestInit init);
+};
