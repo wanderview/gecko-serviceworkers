@@ -7,13 +7,24 @@
 #ifndef mozilla_dom_cache_CacheDBListener_h
 #define mozilla_dom_cache_CacheDBListener_h
 
+#include "mozilla/dom/CacheTypes.h"
+
+template<class T> class nsTArray;
+
 namespace mozilla {
 namespace dom {
+
+class PCacheResponse;
 
 class CacheDBListener
 {
   public:
     virtual ~CacheDBListener() { }
+
+    virtual void OnMatchAll(cache::RequestId aRequestId,
+                            const nsTArray<PCacheResponse>& aResponses)=0;
+    virtual void OnPut(cache::RequestId aRequestId,
+                       const PCacheResponse& aResponse)=0;
 
     // TODO: OnConnected
     // TODO: OnError (or pass nsresult in each On*() method?

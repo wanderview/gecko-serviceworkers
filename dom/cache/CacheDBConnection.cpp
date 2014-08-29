@@ -5,6 +5,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/CacheDBConnection.h"
+
+#include "mozilla/dom/CacheDBListener.h"
+#include "mozilla/dom/CacheTypes.h"
 #include "mozilla/dom/quota/QuotaManager.h"
 #include "nsServiceManagerUtils.h"
 #include "mozIStorageConnection.h"
@@ -19,6 +22,7 @@
 namespace mozilla {
 namespace dom {
 
+using mozilla::dom::cache::RequestId;
 using mozilla::dom::quota::PERSISTENCE_TYPE_PERSISTENT;
 using mozilla::dom::quota::PersistenceType;
 using mozilla::dom::quota::QuotaManager;
@@ -63,6 +67,37 @@ CacheDBConnection::CacheDBConnection(CacheDBListener& aListener,
 
 CacheDBConnection::~CacheDBConnection()
 {
+}
+
+nsresult
+CacheDBConnection::MatchAll(RequestId aRequestId, const PCacheRequest& aRequest,
+                            const PCacheQueryParams& aParams)
+{
+  nsTArray<PCacheResponse> responses;
+
+  if (aRequest.null()) {
+    // TODO: Get all responses
+  } else {
+    // TODO: Run QueryCache algorithm
+  }
+
+  mListener.OnMatchAll(aRequestId, responses);
+  return NS_OK;
+}
+
+nsresult
+CacheDBConnection::Put(RequestId aRequestId, const PCacheRequest& aRequest,
+                       const PCacheResponse& aResponse)
+{
+  PCacheResponse response;
+  response.null() = true;
+
+  // TODO: run QueryCache algorithm on request
+  // TODO: delete any found responses
+  // TODO: insert new request/response pair
+
+  mListener.OnPut(aRequestId, response);
+  return NS_OK;
 }
 
 
@@ -239,6 +274,54 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
                                                           aCacheId,
                                                           conn.forget());
   return ref.forget();
+}
+
+nsresult
+CacheDBConnection::QueryCache(cache::RequestId aRequestId,
+                              const PCacheRequest& aRequest,
+                              const PCacheQueryParams& aParams,
+                              nsTArray<QueryResult>& aResponsesOut)
+{
+  nsTArray<PCacheRequest> requestArray;
+  nsTArray<PCacheResponse> responseArray;
+
+  // TODO: throw if new Request() would have failed:
+  // TODO:    - throw if aRequest is no CORS and method is not simple method
+
+  if (!aParams.ignoreMethod() && aRequest.method().LowerCaseEqualsLiteral("get")
+                              && aRequest.method().LowerCaseEqualsLiteral("head"))
+  {
+    return NS_OK;
+  }
+
+  // TODO: break out URL into separate components to be stored in database?
+
+  // TODO: implement algorithm below
+  // For each request-to-response entry
+    // Let cachedURL be new URL(entry.[[key]].url)
+    // Let requestURL be new URL(request.url)
+    // if params.ignoreSearch
+      // set cachedURL.search to ""
+      // set requestURL.search to "" -> this should make query part of url not matter
+    // if params.prefixMatch
+      // set cachedURL.href to substring of itself with length requestURL.href
+    // if cachedURL.href matches requestURL.href
+      // Add entry.[[key]] to requestArray
+      // Add entry.[[value]] to responseArray
+  // For each cacheResponse in responseArray with index:
+    // let cachedRequest be the indexth element in requestArray
+    // if params.ignoreVary or cachedResponse.headers.has("Vary") is false
+      // add [cachedRequest, cachedResponse] to requestArray
+      // continue to next loop iteration
+    // Let varyHeaders be array of values of cachedResponse.getAll("Vary") (parse out comma-separated values)
+    // For each f in varyHeaders
+      // if f matches "*", then:
+        // continue to next loop iteration
+      // if cacheRequest.headers.get(f) does not match request.headers.get(f)
+        // break out of loop
+      // add [cachedReqeust, cachedResponse] to requestArray
+
+  return NS_OK;
 }
 
 } // namespace dom

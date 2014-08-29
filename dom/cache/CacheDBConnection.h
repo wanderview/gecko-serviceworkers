@@ -12,6 +12,7 @@
 
 class mozIStorageConnection;
 struct nsID;
+template<class T> class nsTArray;
 
 namespace mozilla {
 namespace dom {
@@ -29,6 +30,12 @@ public:
   Create(CacheDBListener& aListener, const nsACString& aOrigin,
          const nsACString& aBaseDomain);
 
+  nsresult MatchAll(cache::RequestId aRequestId, const PCacheRequest& aRequest,
+                    const PCacheQueryParams& aParams);
+
+  nsresult Put(cache::RequestId aRequestId, const PCacheRequest& aRequest,
+               const PCacheResponse& aResponse);
+
 private:
   CacheDBConnection(CacheDBListener& aListener,
                     const nsID& aCacheId,
@@ -40,8 +47,18 @@ private:
                       const nsACString& aBaseDomain, const nsID& aCacheId,
                       bool allowCreate);
 
-  static const int32_t kLatestSchemaVersion = 1;
+  struct QueryResult
+  {
+    PCacheRequest request;
+    PCacheResponse response;
+  };
 
+  nsresult QueryCache(cache::RequestId aRequestId,
+                      const PCacheRequest& aRequest,
+                      const PCacheQueryParams& aParams,
+                      nsTArray<QueryResult>& aResponsesOut);
+
+  static const int32_t kLatestSchemaVersion = 1;
   CacheDBListener& mListener;
   const nsID mCacheId;
   nsCOMPtr<mozIStorageConnection> mDBConnection;

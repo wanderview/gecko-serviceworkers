@@ -42,53 +42,74 @@ CacheParent::ActorDestroy(ActorDestroyReason aReason)
 }
 
 bool
-CacheParent::RecvMatch(const RequestId& requestId, const PCacheRequest& request,
-                       const PCacheQueryParams& params)
+CacheParent::RecvMatch(const RequestId& aRequestId, const PCacheRequest& aRequest,
+                       const PCacheQueryParams& aParams)
 {
   return false;
 }
 
 bool
-CacheParent::RecvMatchAll(const RequestId& requestId,
-                          const PCacheRequest& request,
-                          const PCacheQueryParams& params)
+CacheParent::RecvMatchAll(const RequestId& aRequestId,
+                          const PCacheRequest& aRequest,
+                          const PCacheQueryParams& aParams)
 {
   return false;
 }
 
 bool
-CacheParent::RecvAdd(const RequestId& requestId, const PCacheRequest& request)
+CacheParent::RecvAdd(const RequestId& aRequestId, const PCacheRequest& aRequest)
 {
   return false;
 }
 
 bool
-CacheParent::RecvAddAll(const RequestId& requestId,
-                        const nsTArray<PCacheRequest>& requests)
+CacheParent::RecvAddAll(const RequestId& aRequestId,
+                        const nsTArray<PCacheRequest>& aRequests)
 {
   return false;
 }
 
 bool
-CacheParent::RecvPut(const RequestId& requestId, const PCacheRequest& request,
-                     const PCacheResponse& response)
+CacheParent::RecvPut(const RequestId& aRequestId, const PCacheRequest& aRequest,
+                     const PCacheResponse& aResponse)
+{
+  MOZ_ASSERT(mDBConnection);
+  nsresult rv = mDBConnection->Put(aRequestId, aRequest, aResponse);
+  if (NS_FAILED(rv)) {
+    PCacheResponse response;
+    response.null() = true;
+    unused << SendPutResponse(aRequestId, response);
+  }
+
+  return true;
+}
+
+bool
+CacheParent::RecvDelete(const RequestId& aRequestId,
+                        const PCacheRequest& aRequest,
+                        const PCacheQueryParams& aParams)
 {
   return false;
 }
 
 bool
-CacheParent::RecvDelete(const RequestId& requestId,
-                        const PCacheRequest& request,
-                        const PCacheQueryParams& params)
+CacheParent::RecvKeys(const RequestId& aRequestId, const PCacheRequest& aRequest,
+                      const PCacheQueryParams& aParams)
 {
   return false;
 }
 
-bool
-CacheParent::RecvKeys(const RequestId& requestId, const PCacheRequest& request,
-                      const PCacheQueryParams& params)
+void
+CacheParent::OnMatchAll(cache::RequestId aRequestId,
+                        const nsTArray<PCacheResponse>& aResponses)
 {
-  return false;
+  unused << SendMatchAllResponse(aRequestId, aResponses);
+}
+
+void
+CacheParent::OnPut(RequestId aRequestId, const PCacheResponse& aResponse)
+{
+  unused << SendPutResponse(aRequestId, aResponse);
 }
 
 } // namespace dom

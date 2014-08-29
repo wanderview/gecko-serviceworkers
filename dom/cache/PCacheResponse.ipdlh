@@ -11,6 +11,7 @@ namespace dom {
 
 struct PCacheResponse
 {
+  bool null;
   ResponseType type;
   uint32_t status;
   nsCString statusText;

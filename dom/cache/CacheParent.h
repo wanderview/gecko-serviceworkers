@@ -8,6 +8,7 @@
 #define mozilla_dom_cache_CacheParent_h
 
 #include "mozilla/dom/CacheDBListener.h"
+#include "mozilla/dom/CacheTypes.h"
 #include "mozilla/dom/PCacheParent.h"
 
 struct nsID;
@@ -30,26 +31,34 @@ public:
 
   // PCacheParent method
   virtual bool
-  RecvMatch(const RequestId& requestId, const PCacheRequest& request,
-            const PCacheQueryParams& params) MOZ_OVERRIDE;
+  RecvMatch(const RequestId& aRequestId, const PCacheRequest& aRequest,
+            const PCacheQueryParams& aParams) MOZ_OVERRIDE;
   virtual bool
-  RecvMatchAll(const RequestId& requestId, const PCacheRequest& request,
-               const PCacheQueryParams& params) MOZ_OVERRIDE;
+  RecvMatchAll(const RequestId& aRequestId, const PCacheRequest& aRequest,
+               const PCacheQueryParams& aParams) MOZ_OVERRIDE;
   virtual bool
-  RecvAdd(const RequestId& requestId,
-          const PCacheRequest& request) MOZ_OVERRIDE;
+  RecvAdd(const RequestId& aRequestId,
+          const PCacheRequest& aRequest) MOZ_OVERRIDE;
   virtual bool
-  RecvAddAll(const RequestId& requestId,
-             const nsTArray<PCacheRequest>& requests) MOZ_OVERRIDE;
+  RecvAddAll(const RequestId& aRequestId,
+             const nsTArray<PCacheRequest>& aRequests) MOZ_OVERRIDE;
   virtual bool
-  RecvPut(const RequestId& requestId, const PCacheRequest& request,
-          const PCacheResponse& response) MOZ_OVERRIDE;
+  RecvPut(const RequestId& aRequestId, const PCacheRequest& aRequest,
+          const PCacheResponse& aResponse) MOZ_OVERRIDE;
   virtual bool
-  RecvDelete(const RequestId& requestId, const PCacheRequest& request,
-             const PCacheQueryParams& params) MOZ_OVERRIDE;
+  RecvDelete(const RequestId& aRequestId, const PCacheRequest& aRequest,
+             const PCacheQueryParams& aParams) MOZ_OVERRIDE;
   virtual bool
-  RecvKeys(const RequestId& requestId, const PCacheRequest& request,
-           const PCacheQueryParams& params) MOZ_OVERRIDE;
+  RecvKeys(const RequestId& aRequestId, const PCacheRequest& aRequest,
+           const PCacheQueryParams& aParams) MOZ_OVERRIDE;
+
+  // CacheDBListener methods
+  virtual void
+  OnMatchAll(cache::RequestId aRequestId,
+             const nsTArray<PCacheResponse>& aResponses) MOZ_OVERRIDE;
+  virtual void
+  OnPut(cache::RequestId aRequestId,
+        const PCacheResponse& aResponse) MOZ_OVERRIDE;
 
 private:
   const nsCString mOrigin;
