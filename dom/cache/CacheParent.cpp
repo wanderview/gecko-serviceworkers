@@ -6,6 +6,7 @@
 
 #include "mozilla/dom/CacheParent.h"
 
+#include "mozilla/dom/CacheDBConnection.h"
 #include "nsCOMPtr.h"
 
 namespace mozilla {
@@ -17,9 +18,18 @@ CacheParent::CacheParent(const nsACString& aOrigin,
                          const nsACString& aBaseDomain)
   : mOrigin(aOrigin)
   , mBaseDomain(aBaseDomain)
+  , mDBConnection(CacheDBConnection::Create(*this, aOrigin, aBaseDomain))
 {
-  printf_stderr("### ### CacheParent() origin:%s baseDomain:%s\n",
-                mOrigin.get(), mBaseDomain.get());
+}
+
+CacheParent::CacheParent(const nsACString& aOrigin,
+                         const nsACString& aBaseDomain,
+                         const nsID& aExistingCacheId)
+  : mOrigin(aOrigin)
+  , mBaseDomain(aBaseDomain)
+  , mDBConnection(CacheDBConnection::Get(*this, aOrigin, aBaseDomain,
+                                         aExistingCacheId))
+{
 }
 
 CacheParent::~CacheParent()

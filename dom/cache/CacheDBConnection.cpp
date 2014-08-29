@@ -48,7 +48,10 @@ CacheDBConnection::Create(CacheDBListener& aListener, const nsACString& aOrigin,
     return nullptr;
   }
 
-  return GetOrCreateInternal(aListener, aOrigin, aBaseDomain, cacheId, true);
+  nsRefPtr<CacheDBConnection> ref = GetOrCreateInternal(aListener, aOrigin,
+                                                        aBaseDomain, cacheId,
+                                                        true);
+  return ref.forget();
 }
 
 CacheDBConnection::CacheDBConnection(CacheDBListener& aListener,
@@ -156,6 +159,7 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
     }
   }
   NS_ENSURE_SUCCESS(rv, nullptr);
+  NS_ENSURE_TRUE(conn, nullptr);
 
   // TODO: do we need any pragmas?
   // TODO: enable foreign key support
@@ -167,12 +171,12 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
   if (!schemaVersion) {
     rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
       "CREATE TABLE requests ("
+        "id INTEGER NOT NULL PRIMARY KEY, "
         "method TEXT NOT NULL, "
         "url TEXT NOT NULL, "
         "mode INTEGER NOT NULL, "
-        "credentials INTEGER NOT NULL, "
-        //"body_file TEXT NOT NULL, "
-        "PRIMARY KEY(rowid)"
+        "credentials INTEGER NOT NULL "
+        //"body_file TEXT NOT NULL "
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);
@@ -181,20 +185,19 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
       "CREATE TABLE request_headers ("
         "name TEXT NOT NULL, "
         "value TEXT NOT NULL, "
-        "request_rowid INTEGER NOT NULL, "
-        "PRIMARY KEY(rowid), "
-        "FOREIGN KEY(request_rowid) REFERENCES requests(rowid)"
+        "request_id INTEGER NOT NULL, "
+        "FOREIGN KEY(request_id) REFERENCES requests(id)"
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);
 
     rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
       "CREATE TABLE responses ("
+        "id INTEGER NOT NULL PRIMARY KEY, "
         "type INTEGER NOT NULL, "
         "status INTEGER NOT NULL, "
-        "statusText TEXT NOT NULL, "
-        //"body_file TEXT NOT NULL, "
-        "PRIMARY KEY(rowid)"
+        "statusText TEXT NOT NULL "
+        //"body_file TEXT NOT NULL "
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);
@@ -203,9 +206,8 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
       "CREATE TABLE response_headers ("
         "name TEXT NOT NULL, "
         "value TEXT NOT NULL, "
-        "response_rowid INTEGER NOT NULL, "
-        "PRIMARY KEY(rowid), "
-        "FOREIGN KEY(response_rowid) REFERENCES responses(rowid)"
+        "response_id INTEGER NOT NULL, "
+        "FOREIGN KEY(response_id) REFERENCES responses(id)"
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);

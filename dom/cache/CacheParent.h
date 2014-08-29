@@ -7,17 +7,24 @@
 #ifndef mozilla_dom_cache_CacheParent_h
 #define mozilla_dom_cache_CacheParent_h
 
+#include "mozilla/dom/CacheDBListener.h"
 #include "mozilla/dom/PCacheParent.h"
 
+struct nsID;
 template <class T> class nsRefPtr;
 
 namespace mozilla {
 namespace dom {
 
+class CacheDBConnection;
+
 class CacheParent MOZ_FINAL : public PCacheParent
+                            , public CacheDBListener
 {
 public:
   CacheParent(const nsACString& aOrigin, const nsACString& aBaseDomain);
+  CacheParent(const nsACString& aOrigin, const nsACString& aBaseDomain,
+              const nsID& aExistingCacheId);
   virtual ~CacheParent();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
 
@@ -47,6 +54,7 @@ public:
 private:
   const nsCString mOrigin;
   const nsCString mBaseDomain;
+  nsRefPtr<CacheDBConnection> mDBConnection;
 };
 
 } // namespace dom
