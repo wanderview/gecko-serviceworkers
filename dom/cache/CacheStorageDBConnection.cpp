@@ -12,6 +12,7 @@
 #include "mozIStorageService.h"
 #include "mozIStorageStatement.h"
 #include "mozStorageCID.h"
+#include "mozStorageHelper.h"
 #include "nsIFile.h"
 #include "nsNetUtil.h"
 
@@ -306,11 +307,22 @@ CacheStorageDBConnection::GetOrCreateInternal(CacheStorageDBListener& aListener,
   }
   NS_ENSURE_SUCCESS(rv, nullptr);
 
-  // TODO: do we need any pragmas?
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+  rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+    // Switch the journaling mode to TRUNCATE to avoid changing the directory
+    // structure at the conclusion of every transaction for devices with slower
+    // file systems.
+    "PRAGMA journal_mode = TRUNCATE; "
+  ));
+  NS_ENSURE_SUCCESS(rv, nullptr);
+#endif
 
   int32_t schemaVersion;
   rv = conn->GetSchemaVersion(&schemaVersion);
   NS_ENSURE_SUCCESS(rv, nullptr);
+
+  mozStorageTransaction trans(conn, false,
+                              mozIStorageConnection::TRANSACTION_IMMEDIATE);
 
   if (!schemaVersion) {
     rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
@@ -331,6 +343,9 @@ CacheStorageDBConnection::GetOrCreateInternal(CacheStorageDBListener& aListener,
   }
 
   NS_ENSURE_TRUE(schemaVersion == kLatestSchemaVersion, nullptr);
+
+  rv = trans.Commit();
+  NS_ENSURE_SUCCESS(rv, nullptr);
 
   nsRefPtr<CacheStorageDBConnection> ref =
     new CacheStorageDBConnection(aListener, aNamespace, conn.forget());

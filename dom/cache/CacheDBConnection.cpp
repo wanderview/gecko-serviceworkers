@@ -11,6 +11,7 @@
 #include "mozIStorageService.h"
 #include "mozIStorageStatement.h"
 #include "mozStorageCID.h"
+#include "mozStorageHelper.h"
 #include "nsIFile.h"
 #include "nsIUUIDGenerator.h"
 #include "nsNetUtil.h"
@@ -52,8 +53,11 @@ CacheDBConnection::Create(CacheDBListener& aListener, const nsACString& aOrigin,
 }
 
 CacheDBConnection::CacheDBConnection(CacheDBListener& aListener,
+                                     const nsID& aCacheId,
                                      already_AddRefed<mozIStorageConnection> aConnection)
-  : mDBConnection(aConnection)
+  : mListener(aListener)
+  , mCacheId(aCacheId)
+  , mDBConnection(aConnection)
 {
 }
 
@@ -159,12 +163,23 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
   NS_ENSURE_SUCCESS(rv, nullptr);
   NS_ENSURE_TRUE(conn, nullptr);
 
-  // TODO: do we need any pragmas?
-  // TODO: enable foreign key support
+  rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+    // Switch the journaling mode to TRUNCATE to avoid changing the directory
+    // structure at the conclusion of every transaction for devices with slower
+    // file systems.
+    "PRAGMA journal_mode = TRUNCATE; "
+#endif
+    "PRAGMA foreign_keys = ON; "
+  ));
+  NS_ENSURE_SUCCESS(rv, nullptr);
 
   int32_t schemaVersion;
   rv = conn->GetSchemaVersion(&schemaVersion);
   NS_ENSURE_SUCCESS(rv, nullptr);
+
+  mozStorageTransaction trans(conn, false,
+                              mozIStorageConnection::TRANSACTION_IMMEDIATE);
 
   if (!schemaVersion) {
     rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
@@ -183,8 +198,7 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
       "CREATE TABLE request_headers ("
         "name TEXT NOT NULL, "
         "value TEXT NOT NULL, "
-        "request_id INTEGER NOT NULL, "
-        "FOREIGN KEY(request_id) REFERENCES requests(id)"
+        "request_id INTEGER NOT NULL REFERENCES requests(id) "
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);
@@ -204,8 +218,7 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
       "CREATE TABLE response_headers ("
         "name TEXT NOT NULL, "
         "value TEXT NOT NULL, "
-        "response_id INTEGER NOT NULL, "
-        "FOREIGN KEY(response_id) REFERENCES responses(id)"
+        "response_id INTEGER NOT NULL REFERENCES responses(id) "
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);
@@ -219,7 +232,11 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
 
   NS_ENSURE_TRUE(schemaVersion == kLatestSchemaVersion, nullptr);
 
+  rv = trans.Commit();
+  NS_ENSURE_SUCCESS(rv, nullptr);
+
   nsRefPtr<CacheDBConnection> ref = new CacheDBConnection(aListener,
+                                                          aCacheId,
                                                           conn.forget());
   return ref.forget();
 }

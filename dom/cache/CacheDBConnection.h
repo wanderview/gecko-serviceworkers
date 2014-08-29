@@ -31,6 +31,7 @@ public:
 
 private:
   CacheDBConnection(CacheDBListener& aListener,
+                    const nsID& aCacheId,
                     already_AddRefed<mozIStorageConnection> aConnection);
   ~CacheDBConnection();
 
@@ -41,6 +42,8 @@ private:
 
   static const int32_t kLatestSchemaVersion = 1;
 
+  CacheDBListener& mListener;
+  const nsID mCacheId;
   nsCOMPtr<mozIStorageConnection> mDBConnection;
 
 public:
