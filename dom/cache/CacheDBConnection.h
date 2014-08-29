@@ -41,6 +41,8 @@ private:
 
   static const int32_t kLatestSchemaVersion = 1;
 
+  nsCOMPtr<mozIStorageConnection> mDBConnection;
+
 public:
   NS_INLINE_DECL_REFCOUNTING(CacheDBConnection)
 };

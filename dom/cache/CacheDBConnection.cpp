@@ -48,14 +48,12 @@ CacheDBConnection::Create(CacheDBListener& aListener, const nsACString& aOrigin,
     return nullptr;
   }
 
-  nsRefPtr<CacheDBConnection> ref = GetOrCreateInternal(aListener, aOrigin,
-                                                        aBaseDomain, cacheId,
-                                                        true);
-  return ref.forget();
+  return GetOrCreateInternal(aListener, aOrigin, aBaseDomain, cacheId, true);
 }
 
 CacheDBConnection::CacheDBConnection(CacheDBListener& aListener,
                                      already_AddRefed<mozIStorageConnection> aConnection)
+  : mDBConnection(aConnection)
 {
 }
 
