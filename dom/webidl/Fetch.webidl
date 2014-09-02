@@ -25,10 +25,8 @@ interface FetchBodyStream {
 };
 
 [NoInterfaceObject,
- Exposed=(Window,Worker),
- Func="mozilla::dom::Headers::PrefEnabled"]
+ Exposed=(Window,Worker)]
 interface GlobalFetch {
-  // Promise<Response>
-  [Throws]
+  [Throws, Func="mozilla::dom::Headers::PrefEnabled"]
   Promise<Response> fetch(RequestInfo input, optional RequestInit init);
 };
