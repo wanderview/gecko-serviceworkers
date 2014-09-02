@@ -135,9 +135,6 @@ bool Invalidate(JSContext *cx, JSScript *script, ExecutionMode mode, bool resetU
 bool Invalidate(JSContext *cx, JSScript *script, bool resetUses = true,
                 bool cancelOffThread = true);
 
-void MarkValueFromIon(JSRuntime *rt, Value *vp);
-void MarkShapeFromIon(JSRuntime *rt, Shape **shapep);
-
 void ToggleBarriers(JS::Zone *zone, bool needs);
 
 class IonBuilder;
@@ -210,6 +207,7 @@ bool UpdateForDebugMode(JSContext *maybecx, JSCompartment *comp,
                         AutoDebugModeInvalidation &invalidate);
 
 bool JitSupportsFloatingPoint();
+bool JitSupportsSimd();
 
 } // namespace jit
 } // namespace js

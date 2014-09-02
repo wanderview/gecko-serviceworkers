@@ -42,7 +42,7 @@
 #include "TiledLayerBuffer.h"           // for TiledLayerComposer
 #include "HeapCopyOfStackArray.h"
 
-#if MOZ_ANDROID_OMTC
+#if MOZ_WIDGET_ANDROID
 #include "TexturePoolOGL.h"
 #endif
 
@@ -474,8 +474,8 @@ DecomposeIntoNoRepeatRects(const Rect& aRect,
 
   // If we are dealing with wrapping br.x and br.y are greater than 1.0 so
   // wrap them here as well.
-  br = Point(xwrap ? WrapTexCoord(br.x) : br.x.value,
-             ywrap ? WrapTexCoord(br.y) : br.y.value);
+  br = Point(xwrap ? WrapTexCoord(br.x) : br.x,
+             ywrap ? WrapTexCoord(br.y) : br.y);
 
   // If we wrap around along the x axis, we will draw first from
   // tl.x .. 1.0 and then from 0.0 .. br.x (which we just wrapped above).
@@ -750,7 +750,7 @@ CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
   mPixelsPerFrame = width * height;
   mPixelsFilled = 0;
 
-#if MOZ_ANDROID_OMTC
+#if MOZ_WIDGET_ANDROID
   TexturePoolOGL::Fill(gl());
 #endif
 
@@ -786,7 +786,7 @@ CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
   // If the Android compositor is being used, this clear will be done in
   // DrawWindowUnderlay. Make sure the bits used here match up with those used
   // in mobile/android/base/gfx/LayerRenderer.java
-#ifndef MOZ_ANDROID_OMTC
+#ifndef MOZ_WIDGET_ANDROID
   mGLContext->fClearColor(0.0, 0.0, 0.0, 0.0);
   mGLContext->fClear(LOCAL_GL_COLOR_BUFFER_BIT | LOCAL_GL_DEPTH_BUFFER_BIT);
 #endif
@@ -1493,8 +1493,7 @@ CompositorOGL::CopyToTarget(DrawTarget* aTarget, const nsIntPoint& aTopLeft, con
 
   RefPtr<DataSourceSurface> source =
         Factory::CreateDataSourceSurface(rect.Size(), gfx::SurfaceFormat::B8G8R8A8);
-  if (!source) {
-    NS_WARNING("Failed to create SourceSurface.");
+  if (NS_WARN_IF(!source)) {
     return;
   }
 

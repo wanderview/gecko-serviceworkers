@@ -131,11 +131,10 @@ this.REQUEST_STK_SEND_ENVELOPE_WITH_STATUS = 107;
 this.REQUEST_VOICE_RADIO_TECH = 108;
 this.REQUEST_GET_CELL_INFO_LIST = 109;
 
-// Flame specific parcel types.
-this.REQUEST_SET_UICC_SUBSCRIPTION = 114;
-this.REQUEST_SET_DATA_SUBSCRIPTION = 115;
-this.REQUEST_GET_UICC_SUBSCRIPTION = 116;
-this.REQUEST_GET_DATA_SUBSCRIPTION = 117;
+// CAF specific parcel type. Synced with latest version.
+// Please see https://www.codeaurora.org/cgit/quic/la/platform/hardware/ril/tree/include/telephony/ril.h?h=b2g_kk_3.5
+this.REQUEST_SET_UICC_SUBSCRIPTION = 115;
+this.REQUEST_SET_DATA_SUBSCRIPTION = 116;
 
 // UICC Secure Access.
 this.REQUEST_SIM_OPEN_CHANNEL = 121;
@@ -678,6 +677,16 @@ this.ICC_USIM_EFCCP1_TAG  = 0xcb;
 this.ICC_IMG_CODING_SCHEME_BASIC              = 0x11;
 this.ICC_IMG_CODING_SCHEME_COLOR              = 0x21;
 this.ICC_IMG_CODING_SCHEME_COLOR_TRANSPARENCY = 0x22;
+
+// Must be in sync with enum IccImageCodingScheme in MozStkCommandEvent.webidl.
+this.GECKO_IMG_CODING_SCHEME_BASIC              = "basic";
+this.GECKO_IMG_CODING_SCHEME_COLOR              = "color";
+this.GECKO_IMG_CODING_SCHEME_COLOR_TRANSPARENCY = "color-transparency";
+
+this.ICC_IMG_CODING_SCHEME_TO_GECKO = {};
+ICC_IMG_CODING_SCHEME_TO_GECKO[ICC_IMG_CODING_SCHEME_BASIC] = GECKO_IMG_CODING_SCHEME_BASIC;
+ICC_IMG_CODING_SCHEME_TO_GECKO[ICC_IMG_CODING_SCHEME_COLOR] = GECKO_IMG_CODING_SCHEME_COLOR;
+ICC_IMG_CODING_SCHEME_TO_GECKO[ICC_IMG_CODING_SCHEME_COLOR_TRANSPARENCY] = GECKO_IMG_CODING_SCHEME_COLOR_TRANSPARENCY;
 
 // ICC image header size per coding scheme
 // TS 31.102, Annex B

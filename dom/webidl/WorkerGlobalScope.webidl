@@ -46,6 +46,9 @@ partial interface WorkerGlobalScope {
 
   void dump(optional DOMString str);
 
+  // XXXbz no spec for this yet, because the webperf WG is a bit dysfunctional
+  readonly attribute Performance performance;
+
   [Func="mozilla::dom::CacheStorage::PrefEnabled"]
   readonly attribute CacheStorage caches;
 };

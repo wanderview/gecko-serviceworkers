@@ -50,6 +50,7 @@
 #include "nsIDocument.h"
 #include "nsIDOMTouchEvent.h"
 #include "mozilla/dom/EventTarget.h"
+#include "mozilla/dom/WindowBinding.h"
 #include "Units.h"
 #include "nsComponentManagerUtils.h"
 #include "mozilla/dom/UnionTypes.h"
@@ -116,6 +117,7 @@ class External;
 class Function;
 class Gamepad;
 class MediaQueryList;
+class MozSelfSupport;
 class Navigator;
 class OwningExternalOrWindowProxy;
 class Promise;
@@ -942,6 +944,16 @@ public:
                 mozilla::ErrorResult& aError);
   void ResizeBy(int32_t aWidthDif, int32_t aHeightDif,
                 mozilla::ErrorResult& aError);
+  void Scroll(int32_t aXScroll, int32_t aYScroll,
+              const mozilla::dom::ScrollOptions& aOptions);
+  void ScrollTo(int32_t aXScroll, int32_t aYScroll,
+                const mozilla::dom::ScrollOptions& aOptions);
+  void ScrollBy(int32_t aXScrollDif, int32_t aYScrollDif,
+                const mozilla::dom::ScrollOptions& aOptions);
+  void ScrollByLines(int32_t numLines,
+                     const mozilla::dom::ScrollOptions& aOptions);
+  void ScrollByPages(int32_t numPages,
+                     const mozilla::dom::ScrollOptions& aOptions);
   int32_t GetInnerWidth(mozilla::ErrorResult& aError);
   void SetInnerWidth(int32_t aInnerWidth, mozilla::ErrorResult& aError);
   int32_t GetInnerHeight(mozilla::ErrorResult& aError);
@@ -1012,6 +1024,9 @@ public:
             bool aWrapAround, bool aWholeWord, bool aSearchInFrames,
             bool aShowDialog, mozilla::ErrorResult& aError);
   uint64_t GetMozPaintCount(mozilla::ErrorResult& aError);
+
+  mozilla::dom::MozSelfSupport* GetMozSelfSupport(mozilla::ErrorResult& aError);
+
   already_AddRefed<nsIDOMWindow> OpenDialog(JSContext* aCx,
                                             const nsAString& aUrl,
                                             const nsAString& aName,
@@ -1321,7 +1336,8 @@ public:
                     mozilla::ErrorResult& aError);
   nsRect GetInnerScreenRect();
 
-  void ScrollTo(const mozilla::CSSIntPoint& aScroll);
+  void ScrollTo(const mozilla::CSSIntPoint& aScroll,
+                const mozilla::dom::ScrollOptions& aOptions);
 
   bool IsFrame()
   {
@@ -1558,6 +1574,8 @@ protected:
   // forward declared here means that ~nsGlobalWindow wouldn't compile because
   // it wouldn't see the ~External function's declaration.
   nsCOMPtr<nsISupports>         mExternal;
+
+  nsRefPtr<mozilla::dom::MozSelfSupport> mMozSelfSupport;
 
   nsRefPtr<mozilla::dom::DOMStorage> mLocalStorage;
   nsRefPtr<mozilla::dom::DOMStorage> mSessionStorage;

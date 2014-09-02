@@ -265,7 +265,6 @@ WEBIDL_FILES = [
     'MozActivity.webidl',
     'MozMmsMessage.webidl',
     'MozMobileMessageManager.webidl',
-    'MozNamedAttrMap.webidl',
     'MozPowerManager.webidl',
     'MozSelfSupport.webidl',
     'MozTetheringManager.webidl',
@@ -273,6 +272,7 @@ WEBIDL_FILES = [
     'MozWakeLock.webidl',
     'MutationEvent.webidl',
     'MutationObserver.webidl',
+    'NamedNodeMap.webidl',
     'NativeOSFileInternals.webidl',
     'NetDashboard.webidl',
     'NetworkInformation.webidl',
@@ -338,6 +338,7 @@ WEBIDL_FILES = [
     'SharedWorker.webidl',
     'SharedWorkerGlobalScope.webidl',
     'SimpleGestureEvent.webidl',
+    'SocketCommon.webidl',
     'SourceBuffer.webidl',
     'SourceBufferList.webidl',
     'Storage.webidl',
@@ -473,6 +474,8 @@ WEBIDL_FILES = [
     'TransitionEvent.webidl',
     'TreeColumns.webidl',
     'TreeWalker.webidl',
+    'UDPMessageEvent.webidl',
+    'UDPSocket.webidl',
     'UIEvent.webidl',
     'UndoManager.webidl',
     'URL.webidl',
@@ -665,6 +668,7 @@ GENERATED_EVENTS_WEBIDL_FILES = [
     'MozMmsEvent.webidl',
     'MozOtaStatusEvent.webidl',
     'MozSettingsEvent.webidl',
+    'MozSettingsTransactionEvent.webidl',
     'MozSmsEvent.webidl',
     'MozStkCommandEvent.webidl',
     'PageTransitionEvent.webidl',
@@ -681,6 +685,7 @@ GENERATED_EVENTS_WEBIDL_FILES = [
     'StyleSheetApplicableStateChangeEvent.webidl',
     'StyleSheetChangeEvent.webidl',
     'TrackEvent.webidl',
+    'UDPMessageEvent.webidl',
     'UserProximityEvent.webidl',
     'USSDReceivedEvent.webidl',
 ]
@@ -746,9 +751,9 @@ if CONFIG['MOZ_BUILD_APP'] in ['browser', 'mobile/android', 'xulrunner']:
 
 if CONFIG['MOZ_EME']:
     WEBIDL_FILES += [
+        'MediaEncryptedEvent.webidl',
         'MediaKeyError.webidl',
         'MediaKeyMessageEvent.webidl',
-        'MediaKeyNeededEvent.webidl',
         'MediaKeys.webidl',
         'MediaKeySession.webidl',
     ]

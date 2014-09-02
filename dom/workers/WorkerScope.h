@@ -27,6 +27,7 @@ BEGIN_WORKERS_NAMESPACE
 class WorkerPrivate;
 class WorkerLocation;
 class WorkerNavigator;
+class Performance;
 
 class WorkerGlobalScope : public DOMEventTargetHelper,
                           public nsIGlobalObject
@@ -34,6 +35,7 @@ class WorkerGlobalScope : public DOMEventTargetHelper,
   nsRefPtr<Console> mConsole;
   nsRefPtr<WorkerLocation> mLocation;
   nsRefPtr<WorkerNavigator> mNavigator;
+  nsRefPtr<Performance> mPerformance;
   nsRefPtr<CacheStorage> mCacheStorage;
 
 protected:
@@ -120,6 +122,8 @@ public:
 
   void
   Dump(const Optional<nsAString>& aString) const;
+
+  Performance* GetPerformance();
 
   already_AddRefed<Promise>
   Fetch(const RequestOrScalarValueString& aInput,
