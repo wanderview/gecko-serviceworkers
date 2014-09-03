@@ -86,16 +86,40 @@ CacheDBConnection::MatchAll(RequestId aRequestId, const PCacheRequest& aRequest,
   return NS_OK;
 }
 
+// TODO: Make sure AddAll() doesn't delete entries it just created.
+
 nsresult
 CacheDBConnection::Put(RequestId aRequestId, const PCacheRequest& aRequest,
                        const PCacheResponse& aResponse)
 {
+  if (aResponse.null() || !aRequest.method().LowerCaseEqualsLiteral("get")) {
+    return NS_ERROR_FAILURE;
+  }
+
   PCacheResponse response;
   response.null() = true;
 
-  // TODO: run QueryCache algorithm on request
-  // TODO: delete any found responses
-  // TODO: insert new request/response pair
+  PCacheQueryParams params;
+
+  mozStorageTransaction trans(mConnection, false,
+                              mozIStorageConnection::TRANSACTION_IMMEDIATE);
+
+  nsTArray<EntryId> matches;
+  nsresult rv = QueryCache(aRequest, params, matches);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  for (uint32_t i = 0; i < matches.Length(); ++i) {
+    rv = DeleteEntry(matches[i]);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  rv = InsertEntry(aRequest, aResponse);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = trans.Commit();
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  response = aResponse;
 
   mListener.OnPut(aRequestId, response);
   return NS_OK;
@@ -272,10 +296,9 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
 }
 
 nsresult
-CacheDBConnection::QueryCache(cache::RequestId aRequestId,
-                              const PCacheRequest& aRequest,
+CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
                               const PCacheQueryParams& aParams,
-                              nsTArray<int32_t>& aEntryIdListOut)
+                              nsTArray<EntryId>& aEntryIdListOut)
 {
   nsTArray<PCacheRequest> requestArray;
   nsTArray<PCacheResponse> responseArray;
@@ -309,12 +332,12 @@ CacheDBConnection::QueryCache(cache::RequestId aRequestId,
   nsAutoCString urlComparison;
   if (aParams.prefixMatch()) {
     urlToMatch.AppendLiteral("%");
-    query.Append(NS_LITERAL_CSTRING(" LIKE ?0"));
+    query.Append(NS_LITERAL_CSTRING(" LIKE "));
   } else {
-    query.Append(NS_LITERAL_CSTRING("=?0"));
+    query.Append(NS_LITERAL_CSTRING("="));
   }
 
-  query.Append(NS_LITERAL_CSTRING("GROUP BY map.id"));
+  query.Append(NS_LITERAL_CSTRING("?1 GROUP BY map.id"));
 
   nsCOMPtr<mozIStorageStatement> statement;
   nsresult rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
@@ -325,7 +348,7 @@ CacheDBConnection::QueryCache(cache::RequestId aRequestId,
 
   bool hasMoreData;
   while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
-    int32_t entryId;
+    EntryId entryId;
     rv = statement->GetInt32(0, &entryId);
     if (NS_FAILED(rv)) {
       continue;
@@ -349,12 +372,12 @@ CacheDBConnection::QueryCache(cache::RequestId aRequestId,
 
 bool
 CacheDBConnection::MatchByVaryHeader(const PCacheRequest& aRequest,
-                                     int32_t entryId)
+                                     EntryId entryId)
 {
   nsCOMPtr<mozIStorageStatement> statement;
   nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
     "SELECT value FROM response_headers "
-    "WHERE name='vary' AND map_id=?0"
+    "WHERE name='vary' AND map_id=?1"
   ), getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, false);
 
@@ -381,7 +404,7 @@ CacheDBConnection::MatchByVaryHeader(const PCacheRequest& aRequest,
   statement->Reset();
   rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
     "SELECT name, value FROM request_headers "
-    "WHERE AND map_id=?0"
+    "WHERE AND map_id=?1"
   ), getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, false);
 
@@ -428,6 +451,164 @@ CacheDBConnection::MatchByVaryHeader(const PCacheRequest& aRequest,
   }
 
   return true;
+}
+
+nsresult
+CacheDBConnection::DeleteEntry(int32_t aEntryId)
+{
+  // TODO: do this async
+  // TODO: use a transaction
+
+  nsCOMPtr<mozIStorageStatement> statement;
+
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "DELETE FROM response_headers WHERE map_id=?1"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(0, aEntryId);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // Don't stop if this fails.  There may not be any entries in this table,
+  // but we must continue to process the other tables.
+  statement->Execute();
+
+  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "DELETE FROM request_headers WHERE map_id=?1"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(0, aEntryId);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // Don't stop if this fails.  There may not be any entries in this table,
+  // but we must continue to process the other tables.
+  statement->Execute();
+
+  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "DELETE FROM map WHERE id=?1"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(0, aEntryId);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->Execute();
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return NS_OK;
+}
+
+nsresult
+CacheDBConnection::InsertEntry(const PCacheRequest& aRequest,
+                               const PCacheResponse& aResponse)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "INSERT INTO map ("
+      "request_method, "
+      "request_url, "
+      "request_url_no_query, "
+      "request_mode, "
+      "request_credentials, "
+      "response_type, "
+      "response_status, "
+      "response_status_text "
+    ") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindUTF8StringParameter(0, aRequest.method());
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindStringParameter(1, aRequest.url());
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindStringParameter(2, aRequest.urlWithoutQuery());
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(3, static_cast<int32_t>(aRequest.mode()));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(4,
+    static_cast<int32_t>(aRequest.credentials()));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(5, static_cast<int32_t>(aResponse.type()));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(6, aResponse.status());
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindUTF8StringParameter(7, aResponse.statusText());
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->Execute();
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT last_insert_rowid()"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  bool hasMoreData;
+  rv = statement->ExecuteStep(&hasMoreData);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  int32_t mapId;
+  rv = statement->GetInt32(0, &mapId);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "INSERT INTO request_headers ("
+      "name, "
+      "value, "
+      "map_id "
+    ") VALUES (?1, ?2, ?3)"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  const nsTArray<PHeadersEntry>& requestHeaders = aRequest.headers().list();
+  for (uint32_t i = 0; i < requestHeaders.Length(); ++i) {
+    rv = statement->BindUTF8StringParameter(0, requestHeaders[i].name());
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = statement->BindUTF8StringParameter(1, requestHeaders[i].value());
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = statement->BindInt32Parameter(2, mapId);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = statement->Execute();
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "INSERT INTO response_headers ("
+      "name, "
+      "value, "
+      "map_id "
+    ") VALUES (?1, ?2, ?3)"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  const nsTArray<PHeadersEntry>& responseHeaders = aResponse.headers().list();
+  for (uint32_t i = 0; i < responseHeaders.Length(); ++i) {
+    rv = statement->BindUTF8StringParameter(0, responseHeaders[i].name());
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = statement->BindUTF8StringParameter(1, responseHeaders[i].value());
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = statement->BindInt32Parameter(2, mapId);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = statement->Execute();
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  return NS_OK;
 }
 
 } // namespace dom

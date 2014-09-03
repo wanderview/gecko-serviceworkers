@@ -13,6 +13,7 @@
 #include "nsPIDOMWindow.h"
 
 #include "mozilla/dom/FetchBodyStream.h"
+#include "mozilla/dom/Headers.h"
 #include "mozilla/dom/URL.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/dom/WorkerPrivate.h"
@@ -52,6 +53,7 @@ Request::PrefEnabled(JSContext* aCx, JSObject* aObj)
 Request::Request(nsISupports* aOwner, InternalRequest* aRequest)
   : mOwner(aOwner)
   , mRequest(aRequest)
+  , mHeaders(new Headers(aOwner))
 {
   SetIsDOMBinding();
 }
@@ -69,7 +71,8 @@ Request::GetHeader(const nsAString& header, DOMString& value) const
 already_AddRefed<Headers>
 Request::HeadersValue() const
 {
-  MOZ_CRASH("NOT IMPLEMENTED!");
+  nsRefPtr<Headers> ref = mHeaders;
+  return ref.forget();
 }
 
 already_AddRefed<FetchBodyStream>

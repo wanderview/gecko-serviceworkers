@@ -44,6 +44,8 @@ Response::PrefEnabled(JSContext* aCx, JSObject* aObj)
 
 Response::Response(nsISupports* aOwner)
   : mOwner(aOwner)
+  , mType(ResponseType::Default)
+  , mHeaders(new Headers(aOwner))
 {
   SetIsDOMBinding();
 }
@@ -55,7 +57,8 @@ Response::~Response()
 already_AddRefed<Headers>
 Response::Headers_() const
 {
-  MOZ_CRASH("NOT IMPLEMENTED!");
+  nsRefPtr<Headers> ref = mHeaders;
+  return ref.forget();
 }
 
 /* static */ already_AddRefed<Response>

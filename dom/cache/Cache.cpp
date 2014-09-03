@@ -127,6 +127,7 @@ ToPCacheRequest(PCacheRequest& aOut,
 static void
 ToPCacheResponse(PCacheResponse& aOut, const Response& aIn)
 {
+  aOut.null() = false;
   aOut.type() = aIn.Type();
   aOut.status() = aIn.Status();
   aIn.GetStatusText(aOut.statusText());
@@ -504,6 +505,10 @@ Cache::RecvPutResponse(RequestId aRequestId, const PCacheResponse& aResponse)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
+    return;
+  }
+  if (aResponse.null()) {
+    promise->MaybeResolve(nullptr);
     return;
   }
   nsRefPtr<Response> response = new Response(mOwner);

@@ -53,11 +53,15 @@ private:
     PCacheResponse response;
   };
 
-  nsresult QueryCache(cache::RequestId aRequestId,
-                      const PCacheRequest& aRequest,
+  typedef int32_t EntryId;
+
+  nsresult QueryCache(const PCacheRequest& aRequest,
                       const PCacheQueryParams& aParams,
-                      nsTArray<int32_t>& aEntryIdListOut);
+                      nsTArray<EntryId>& aEntryIdListOut);
   bool MatchByVaryHeader(const PCacheRequest& aRequest, int32_t entryId);
+  nsresult DeleteEntry(int32_t aEntryId);
+  nsresult InsertEntry(const PCacheRequest& aRequest,
+                       const PCacheResponse& aResponse);
 
   static const int32_t kLatestSchemaVersion = 1;
   CacheDBListener& mListener;

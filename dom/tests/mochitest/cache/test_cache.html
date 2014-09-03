@@ -14,7 +14,8 @@
 SimpleTest.waitForExplicitFinish();
 SpecialPowers.setBoolPref("dom.window-caches.enabled", true);
 SpecialPowers.pushPrefEnv({
-  "set": [["dom.window-caches.enabled", true]]
+  "set": [["dom.window-caches.enabled", true],
+          ["dom.fetch.enabled", true]]
 }, function() {
   var frame = document.getElementById("frame");
   frame.src = "test_cache_frame.html";

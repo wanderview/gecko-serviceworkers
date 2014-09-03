@@ -104,9 +104,9 @@ private:
 
   nsISupports* mOwner;
 
-  // Headers?
   nsRefPtr<FetchBodyStream> mBody;
   nsRefPtr<InternalRequest> mRequest;
+  nsRefPtr<Headers> mHeaders;
 };
 
 } // namespace dom

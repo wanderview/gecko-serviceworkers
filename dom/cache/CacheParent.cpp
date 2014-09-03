@@ -78,6 +78,7 @@ CacheParent::RecvPut(const RequestId& aRequestId, const PCacheRequest& aRequest,
   if (NS_FAILED(rv)) {
     PCacheResponse response;
     response.null() = true;
+    response.type() = ResponseType::Default;
     unused << SendPutResponse(aRequestId, response);
   }
 
