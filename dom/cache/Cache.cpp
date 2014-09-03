@@ -26,6 +26,8 @@ using mozilla::unused;
 using mozilla::dom::cache::INVALID_REQUEST_ID;
 using mozilla::dom::cache::RequestId;
 
+// Utility function to remove the query from a URL.  We're not using nsIURL
+// or URL to do this because they require going to the main thread.
 static nsresult
 GetURLWithoutQuery(const nsAString& aUrl, nsAString& aUrlWithoutQueryOut)
 {
@@ -39,8 +41,8 @@ GetURLWithoutQuery(const nsAString& aUrl, nsAString& aUrlWithoutQueryOut)
   int32_t pathLen;
 
   nsresult rv = urlParser->ParseURL(url, flatURL.Length(),
-                                    nullptr, nullptr,
-                                    nullptr, nullptr,
+                                    nullptr, nullptr,       // ignore scheme
+                                    nullptr, nullptr,       // ignore authority
                                     &pathPos, &pathLen);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -48,12 +50,18 @@ GetURLWithoutQuery(const nsAString& aUrl, nsAString& aUrlWithoutQueryOut)
   int32_t queryLen;
 
   rv = urlParser->ParsePath(url + pathPos, flatURL.Length() - pathPos,
-                            nullptr, nullptr,
+                            nullptr, nullptr,               // ignore filepath
                             &queryPos, &queryLen,
-                            nullptr, nullptr);
+                            nullptr, nullptr);              // ignore ref
   NS_ENSURE_SUCCESS(rv, rv);
 
-  aUrlWithoutQueryOut = Substring(aUrl, 0, pathPos + queryPos);
+  // ParsePath gives us query position relative to the start of the path
+  queryPos += pathPos;
+
+  // We want everything before and after the query
+  aUrlWithoutQueryOut = Substring(aUrl, 0, queryPos);
+  aUrlWithoutQueryOut.Append(Substring(aUrl, queryPos + queryLen,
+                                       aUrl.Length() - queryPos - queryLen));
 
   return NS_OK;
 }
