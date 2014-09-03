@@ -56,12 +56,13 @@ private:
   nsresult QueryCache(cache::RequestId aRequestId,
                       const PCacheRequest& aRequest,
                       const PCacheQueryParams& aParams,
-                      nsTArray<QueryResult>& aResponsesOut);
+                      nsTArray<int32_t>& aEntryIdListOut);
+  bool MatchByVaryHeader(const PCacheRequest& aRequest, int32_t entryId);
 
   static const int32_t kLatestSchemaVersion = 1;
   CacheDBListener& mListener;
   const nsID mCacheId;
-  nsCOMPtr<mozIStorageConnection> mDBConnection;
+  nsCOMPtr<mozIStorageConnection> mConnection;
 
 public:
   NS_INLINE_DECL_REFCOUNTING(CacheDBConnection)

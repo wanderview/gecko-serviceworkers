@@ -41,6 +41,14 @@ public:
     SetIsDOMBinding();
   }
 
+  Headers(nsISupports* aOwner, const PHeaders& aHeaders,
+          HeadersGuardEnum aGuard = HeadersGuardEnum::None)
+    : mOwner(aOwner)
+    , mGuard(aGuard)
+    , mHeaders(aHeaders)
+  {
+  }
+
   static bool PrefEnabled(JSContext* cx, JSObject* obj);
 
   static already_AddRefed<Headers>

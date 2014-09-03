@@ -15,6 +15,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/unused.h"
 #include "nsIGlobalObject.h"
+#include "nsNetUtil.h"
 
 namespace mozilla {
 namespace dom {
@@ -29,6 +30,10 @@ ToPCacheRequest(PCacheRequest& aOut, const Request& aIn)
 {
   aIn.GetMethod(aOut.method());
   aIn.GetUrl(aOut.url());
+
+  // TODO: populate urlWithoutQuery properly
+  aIn.GetUrl(aOut.urlWithoutQuery());
+
   nsRefPtr<Headers> headers = aIn.HeadersValue();
   MOZ_ASSERT(headers);
   aOut.headers() = headers->AsPHeaders();

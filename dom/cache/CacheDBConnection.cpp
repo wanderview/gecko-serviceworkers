@@ -8,6 +8,7 @@
 
 #include "mozilla/dom/CacheDBListener.h"
 #include "mozilla/dom/CacheTypes.h"
+#include "mozilla/dom/Headers.h"
 #include "mozilla/dom/quota/QuotaManager.h"
 #include "nsServiceManagerUtils.h"
 #include "mozIStorageConnection.h"
@@ -61,7 +62,7 @@ CacheDBConnection::CacheDBConnection(CacheDBListener& aListener,
                                      already_AddRefed<mozIStorageConnection> aConnection)
   : mListener(aListener)
   , mCacheId(aCacheId)
-  , mDBConnection(aConnection)
+  , mConnection(aConnection)
 {
 }
 
@@ -218,13 +219,18 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
 
   if (!schemaVersion) {
     rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-      "CREATE TABLE requests ("
+      "CREATE TABLE map ("
         "id INTEGER NOT NULL PRIMARY KEY, "
-        "method TEXT NOT NULL, "
-        "url TEXT NOT NULL, "
-        "mode INTEGER NOT NULL, "
-        "credentials INTEGER NOT NULL "
-        //"body_file TEXT NOT NULL "
+        "request_method TEXT NOT NULL, "
+        "request_url TEXT NOT NULL, "
+        "request_url_no_query TEXT NOT NULL, "
+        "request_mode INTEGER NOT NULL, "
+        "request_credentials INTEGER NOT NULL, "
+        //"request_body_file TEXT NOT NULL, "
+        "response_type INTEGER NOT NULL, "
+        "response_status INTEGER NOT NULL, "
+        "response_status_text TEXT NOT NULL "
+        //"response_body_file TEXT NOT NULL "
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);
@@ -233,18 +239,7 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
       "CREATE TABLE request_headers ("
         "name TEXT NOT NULL, "
         "value TEXT NOT NULL, "
-        "request_id INTEGER NOT NULL REFERENCES requests(id) "
-      ");"
-    ));
-    NS_ENSURE_SUCCESS(rv, nullptr);
-
-    rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-      "CREATE TABLE responses ("
-        "id INTEGER NOT NULL PRIMARY KEY, "
-        "type INTEGER NOT NULL, "
-        "status INTEGER NOT NULL, "
-        "statusText TEXT NOT NULL "
-        //"body_file TEXT NOT NULL "
+        "map_id INTEGER NOT NULL REFERENCES map(id) "
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);
@@ -253,7 +248,7 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
       "CREATE TABLE response_headers ("
         "name TEXT NOT NULL, "
         "value TEXT NOT NULL, "
-        "response_id INTEGER NOT NULL REFERENCES responses(id) "
+        "map_id INTEGER NOT NULL REFERENCES map(id) "
       ");"
     ));
     NS_ENSURE_SUCCESS(rv, nullptr);
@@ -280,7 +275,7 @@ nsresult
 CacheDBConnection::QueryCache(cache::RequestId aRequestId,
                               const PCacheRequest& aRequest,
                               const PCacheQueryParams& aParams,
-                              nsTArray<QueryResult>& aResponsesOut)
+                              nsTArray<int32_t>& aEntryIdListOut)
 {
   nsTArray<PCacheRequest> requestArray;
   nsTArray<PCacheResponse> responseArray;
@@ -288,40 +283,151 @@ CacheDBConnection::QueryCache(cache::RequestId aRequestId,
   // TODO: throw if new Request() would have failed:
   // TODO:    - throw if aRequest is no CORS and method is not simple method
 
-  if (!aParams.ignoreMethod() && aRequest.method().LowerCaseEqualsLiteral("get")
-                              && aRequest.method().LowerCaseEqualsLiteral("head"))
+  if (!aParams.ignoreMethod() && !aRequest.method().LowerCaseEqualsLiteral("get")
+                              && !aRequest.method().LowerCaseEqualsLiteral("head"))
   {
     return NS_OK;
   }
 
-  // TODO: break out URL into separate components to be stored in database?
+  nsAutoCString query(
+    "SELECT id, COUNT(response_headers.name) AS vary_count "
+    "FROM map "
+    "LEFT OUTER JOIN response_headers ON map.id=response_headers.map_id "
+                                    "AND response_headers.name='vary' "
+    "WHERE map."
+  );
 
-  // TODO: implement algorithm below
-  // For each request-to-response entry
-    // Let cachedURL be new URL(entry.[[key]].url)
-    // Let requestURL be new URL(request.url)
-    // if params.ignoreSearch
-      // set cachedURL.search to ""
-      // set requestURL.search to "" -> this should make query part of url not matter
-    // if params.prefixMatch
-      // set cachedURL.href to substring of itself with length requestURL.href
-    // if cachedURL.href matches requestURL.href
-      // Add entry.[[key]] to requestArray
-      // Add entry.[[value]] to responseArray
-  // For each cacheResponse in responseArray with index:
-    // let cachedRequest be the indexth element in requestArray
-    // if params.ignoreVary or cachedResponse.headers.has("Vary") is false
-      // add [cachedRequest, cachedResponse] to requestArray
-      // continue to next loop iteration
-    // Let varyHeaders be array of values of cachedResponse.getAll("Vary") (parse out comma-separated values)
-    // For each f in varyHeaders
-      // if f matches "*", then:
-        // continue to next loop iteration
-      // if cacheRequest.headers.get(f) does not match request.headers.get(f)
-        // break out of loop
-      // add [cachedReqeust, cachedResponse] to requestArray
+  nsAutoString urlToMatch;
+  if (aParams.ignoreSearch()) {
+    urlToMatch = aRequest.urlWithoutQuery();
+    query.Append(NS_LITERAL_CSTRING("request_url_no_query"));
+  } else {
+    urlToMatch = aRequest.url();
+    query.Append(NS_LITERAL_CSTRING("request_url"));
+  }
+
+  nsAutoCString urlComparison;
+  if (aParams.prefixMatch()) {
+    urlToMatch.AppendLiteral("%");
+    query.Append(NS_LITERAL_CSTRING(" LIKE ?0"));
+  } else {
+    query.Append(NS_LITERAL_CSTRING("=?0"));
+  }
+
+  query.Append(NS_LITERAL_CSTRING("GROUP BY map.id"));
+
+  nsCOMPtr<mozIStorageStatement> statement;
+  nsresult rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindStringParameter(0, urlToMatch);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  bool hasMoreData;
+  while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
+    int32_t entryId;
+    rv = statement->GetInt32(0, &entryId);
+    if (NS_FAILED(rv)) {
+      continue;
+    }
+    int32_t varyCount;
+    rv = statement->GetInt32(0, &varyCount);
+    if (NS_FAILED(rv)) {
+      continue;
+    }
+
+    if (!aParams.ignoreVary() && varyCount > 0 &&
+        !MatchByVaryHeader(aRequest, entryId)) {
+      continue;
+    }
+
+    aEntryIdListOut.AppendElement(entryId);
+  }
 
   return NS_OK;
+}
+
+bool
+CacheDBConnection::MatchByVaryHeader(const PCacheRequest& aRequest,
+                                     int32_t entryId)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT value FROM response_headers "
+    "WHERE name='vary' AND map_id=?0"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, false);
+
+  rv = statement->BindInt32Parameter(0, entryId);
+  NS_ENSURE_SUCCESS(rv, false);
+
+  // TODO: do this async
+  // TODO: use a transaction
+
+  nsTArray<nsCString> varyValues;
+
+  bool hasMoreData;
+  while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
+    nsCString* value = varyValues.AppendElement();
+    NS_ENSURE_TRUE(value, false);
+    rv = statement->GetUTF8String(0, *value);
+    NS_ENSURE_SUCCESS(rv, false);
+  }
+  NS_ENSURE_SUCCESS(rv, false);
+
+  // Should not have called this function if this was not the case
+  MOZ_ASSERT(varyValues.Length() > 0);
+
+  statement->Reset();
+  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT name, value FROM request_headers "
+    "WHERE AND map_id=?0"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, false);
+
+  rv = statement->BindInt32Parameter(0, entryId);
+  NS_ENSURE_SUCCESS(rv, false);
+
+  nsRefPtr<Headers> cachedHeaders = new Headers(nullptr);
+  NS_ENSURE_TRUE(cachedHeaders, false);
+
+  ErrorResult errorResult;
+
+  while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
+    nsAutoCString name;
+    nsAutoCString value;
+    rv = statement->GetUTF8String(0, name);
+    NS_ENSURE_SUCCESS(rv, false);
+    rv = statement->GetUTF8String(1, value);
+    NS_ENSURE_SUCCESS(rv, false);
+
+    cachedHeaders->Append(name, value, errorResult);
+    ENSURE_SUCCESS(errorResult, false);
+  }
+  NS_ENSURE_SUCCESS(rv, false);
+
+  nsRefPtr<Headers> queryHeaders = new Headers(nullptr, aRequest.headers());
+  NS_ENSURE_TRUE(queryHeaders, false);
+
+  for (uint32_t i = 0; i < varyValues.Length(); ++i) {
+    if (varyValues[i].EqualsLiteral("*")) {
+      continue;
+    }
+
+    nsAutoCString queryValue;
+    queryHeaders->Get(varyValues[i], queryValue, errorResult);
+    ENSURE_SUCCESS(errorResult, false);
+
+    nsAutoCString cachedValue;
+    cachedHeaders->Get(varyValues[i], cachedValue, errorResult);
+    ENSURE_SUCCESS(errorResult, false);
+
+    if (queryValue != cachedValue) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 } // namespace dom

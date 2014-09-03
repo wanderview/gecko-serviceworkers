@@ -15,6 +15,7 @@ struct PCacheRequest
   bool null;
   nsCString method;
   nsString url;
+  nsString urlWithoutQuery;
   PHeaders headers;
   RequestMode mode;
   RequestCredentials credentials;
