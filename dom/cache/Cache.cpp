@@ -16,6 +16,7 @@
 #include "mozilla/unused.h"
 #include "nsIGlobalObject.h"
 #include "nsNetUtil.h"
+#include "nsURLParsers.h"
 
 namespace mozilla {
 namespace dom {
@@ -25,15 +26,49 @@ using mozilla::unused;
 using mozilla::dom::cache::INVALID_REQUEST_ID;
 using mozilla::dom::cache::RequestId;
 
+static nsresult
+GetURLWithoutQuery(const nsAString& aUrl, nsAString& aUrlWithoutQueryOut)
+{
+  NS_ConvertUTF16toUTF8 flatURL(aUrl);
+  const char* url = flatURL.get();
+
+  nsCOMPtr<nsIURLParser> urlParser = new nsStdURLParser();
+  NS_ENSURE_TRUE(urlParser, NS_ERROR_OUT_OF_MEMORY);
+
+  uint32_t pathPos;
+  int32_t pathLen;
+
+  nsresult rv = urlParser->ParseURL(url, flatURL.Length(),
+                                    nullptr, nullptr,
+                                    nullptr, nullptr,
+                                    &pathPos, &pathLen);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  uint32_t queryPos;
+  int32_t queryLen;
+
+  rv = urlParser->ParsePath(url + pathPos, flatURL.Length() - pathPos,
+                            nullptr, nullptr,
+                            &queryPos, &queryLen,
+                            nullptr, nullptr);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  aUrlWithoutQueryOut = Substring(aUrl, 0, pathPos + queryPos);
+
+  return NS_OK;
+}
+
 static void
 ToPCacheRequest(PCacheRequest& aOut, const Request& aIn)
 {
   aIn.GetMethod(aOut.method());
   aIn.GetUrl(aOut.url());
-
-  // TODO: populate urlWithoutQuery properly
-  aIn.GetUrl(aOut.urlWithoutQuery());
-
+  if(NS_WARN_IF(NS_FAILED(GetURLWithoutQuery(aOut.url(),
+                                              aOut.urlWithoutQuery())))) {
+    // Fallback to just not providing ignoreSearch support
+    // TODO: Should we error out here instead?
+    aIn.GetUrl(aOut.urlWithoutQuery());
+  }
   nsRefPtr<Headers> headers = aIn.HeadersValue();
   MOZ_ASSERT(headers);
   aOut.headers() = headers->AsPHeaders();
