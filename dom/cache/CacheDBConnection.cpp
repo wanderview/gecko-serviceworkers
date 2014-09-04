@@ -28,6 +28,34 @@ using mozilla::dom::quota::PERSISTENCE_TYPE_PERSISTENT;
 using mozilla::dom::quota::PersistenceType;
 using mozilla::dom::quota::QuotaManager;
 
+static void
+AppendListParamsToQuery(nsACString& aQuery,
+                        const nsTArray<CacheDBConnection::EntryId>& aEntryIdList,
+                        uint32_t aPos, int32_t aLen)
+{
+  MOZ_ASSERT((aPos + aLen) <= aEntryIdList.Length());
+  for (int32_t i = aPos; i < aLen; ++i) {
+    if (i == 0) {
+      aQuery.Append(NS_LITERAL_CSTRING("?"));
+    } else {
+      aQuery.Append(NS_LITERAL_CSTRING(",?"));
+    }
+  }
+}
+
+static nsresult
+BindListParamsToQuery(mozIStorageStatement* aStatement,
+                      const nsTArray<CacheDBConnection::EntryId>& aEntryIdList,
+                      uint32_t aPos, int32_t aLen)
+{
+  MOZ_ASSERT((aPos + aLen) <= aEntryIdList.Length());
+  for (int32_t i = aPos; i < aLen; ++i) {
+    nsresult rv = aStatement->BindInt32Parameter(i, aEntryIdList[i]);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+  return NS_OK;
+}
+
 //static
 already_AddRefed<CacheDBConnection>
 CacheDBConnection::Get(CacheDBListener& aListener, const nsACString& aOrigin,
@@ -97,7 +125,8 @@ CacheDBConnection::Put(RequestId aRequestId, const PCacheRequest& aRequest,
     return NS_ERROR_FAILURE;
   }
 
-  PCacheQueryParams params;
+  PCacheQueryParams params(false, false, false, false, false,
+                           NS_LITERAL_STRING(""));
 
   mozStorageTransaction trans(mConnection, false,
                               mozIStorageConnection::TRANSACTION_IMMEDIATE);
@@ -106,10 +135,8 @@ CacheDBConnection::Put(RequestId aRequestId, const PCacheRequest& aRequest,
   nsresult rv = QueryCache(aRequest, params, matches);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  for (uint32_t i = 0; i < matches.Length(); ++i) {
-    rv = DeleteEntry(matches[i]);
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
+  rv = DeleteEntries(matches);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   rv = InsertEntry(aRequest, aResponse);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -123,6 +150,32 @@ CacheDBConnection::Put(RequestId aRequestId, const PCacheRequest& aRequest,
   return NS_OK;
 }
 
+nsresult
+CacheDBConnection::Delete(cache::RequestId aRequestId,
+                          const PCacheRequest& aRequest,
+                          const PCacheQueryParams& aParams)
+{
+  PCacheQueryParams params;
+
+  mozStorageTransaction trans(mConnection, false,
+                              mozIStorageConnection::TRANSACTION_IMMEDIATE);
+
+  nsTArray<EntryId> matches;
+  nsresult rv = QueryCache(aRequest, aParams, matches);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (matches.Length() > 0) {
+    rv = DeleteEntries(matches);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = trans.Commit();
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  mListener.OnDelete(aRequestId, matches.Length() > 0);
+
+  return NS_OK;
+}
 
 //static
 already_AddRefed<CacheDBConnection>
@@ -330,16 +383,23 @@ CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
   nsAutoCString urlComparison;
   if (aParams.prefixMatch()) {
     urlToMatch.AppendLiteral("%");
-    query.Append(NS_LITERAL_CSTRING(" LIKE "));
+    query.Append(NS_LITERAL_CSTRING(" LIKE ?1 ESCAPE '\\'"));
   } else {
-    query.Append(NS_LITERAL_CSTRING("="));
+    query.Append(NS_LITERAL_CSTRING("=?1"));
   }
 
-  query.Append(NS_LITERAL_CSTRING("?1 GROUP BY map.id"));
+  query.Append(NS_LITERAL_CSTRING(" GROUP BY map.id"));
 
   nsCOMPtr<mozIStorageStatement> statement;
   nsresult rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
+
+  if (aParams.prefixMatch()) {
+    nsAutoString escapedUrlToMatch;
+    rv = statement->EscapeStringForLIKE(urlToMatch, '\\', escapedUrlToMatch);
+    NS_ENSURE_SUCCESS(rv, rv);
+    urlToMatch = escapedUrlToMatch;
+  }
 
   rv = statement->BindStringParameter(0, urlToMatch);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -352,7 +412,7 @@ CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
       continue;
     }
     int32_t varyCount;
-    rv = statement->GetInt32(0, &varyCount);
+    rv = statement->GetInt32(1, &varyCount);
     if (NS_FAILED(rv)) {
       continue;
     }
@@ -452,43 +512,82 @@ CacheDBConnection::MatchByVaryHeader(const PCacheRequest& aRequest,
 }
 
 nsresult
-CacheDBConnection::DeleteEntry(int32_t aEntryId)
+CacheDBConnection::DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
+                                 uint32_t aPos, int32_t aLen)
 {
   // TODO: do this async
   // TODO: use a transaction
 
+  if (aEntryIdList.Length() < 1) {
+    return NS_OK;
+  }
+
+  MOZ_ASSERT(aPos < aEntryIdList.Length());
+
+  if (aLen < 0) {
+    aLen = aEntryIdList.Length() - aPos;
+  }
+
+  // Sqlite limits the number of entries allowed for an IN clause,
+  // so split up larger operations.
+  static const int32_t MAX_ENTRIES_PER_STATEMENT = 255;
+  if (aLen > MAX_ENTRIES_PER_STATEMENT) {
+    uint32_t curPos = aPos;
+    int32_t remaining = aLen;
+    while (remaining > 0) {
+      int32_t curLen = std::min(MAX_ENTRIES_PER_STATEMENT, remaining);
+      nsresult rv = DeleteEntries(aEntryIdList, curPos, curLen);
+      NS_ENSURE_SUCCESS(rv, rv);
+
+      curPos += curLen;
+      remaining -= curLen;
+    }
+    return NS_OK;
+  }
+
   nsCOMPtr<mozIStorageStatement> statement;
+  nsAutoCString query(
+    "DELETE FROM response_headers WHERE map_id IN ("
+  );
+  AppendListParamsToQuery(query, aEntryIdList, aPos, aLen);
+  query.Append(NS_LITERAL_CSTRING(")"));
 
-  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
-    "DELETE FROM response_headers WHERE map_id=?1"
-  ), getter_AddRefs(statement));
+  nsresult rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  rv = statement->BindInt32Parameter(0, aEntryId);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // Don't stop if this fails.  There may not be any entries in this table,
-  // but we must continue to process the other tables.
-  statement->Execute();
-
-  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
-    "DELETE FROM request_headers WHERE map_id=?1"
-  ), getter_AddRefs(statement));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = statement->BindInt32Parameter(0, aEntryId);
+  rv = BindListParamsToQuery(statement, aEntryIdList, aPos, aLen);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Don't stop if this fails.  There may not be any entries in this table,
   // but we must continue to process the other tables.
   statement->Execute();
 
-  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
-    "DELETE FROM map WHERE id=?1"
-  ), getter_AddRefs(statement));
+  query = NS_LITERAL_CSTRING(
+    "DELETE FROM request_headers WHERE map_id IN ("
+  );
+  AppendListParamsToQuery(query, aEntryIdList, aPos, aLen);
+  query.Append(NS_LITERAL_CSTRING(")"));
+
+  rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  rv = statement->BindInt32Parameter(0, aEntryId);
+  rv = BindListParamsToQuery(statement, aEntryIdList, aPos, aLen);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // Don't stop if this fails.  There may not be any entries in this table,
+  // but we must continue to process the other tables.
+  statement->Execute();
+
+  query = NS_LITERAL_CSTRING(
+    "DELETE FROM map WHERE id IN ("
+  );
+  AppendListParamsToQuery(query, aEntryIdList, aPos, aLen);
+  query.Append(NS_LITERAL_CSTRING(")"));
+
+  rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = BindListParamsToQuery(statement, aEntryIdList, aPos, aLen);
   NS_ENSURE_SUCCESS(rv, rv);
 
   rv = statement->Execute();

@@ -22,6 +22,8 @@ class CacheDBListener;
 class CacheDBConnection MOZ_FINAL
 {
 public:
+  typedef int32_t EntryId;
+
   static already_AddRefed<CacheDBConnection>
   Get(CacheDBListener& aListener, const nsACString& aOrigin,
       const nsACString& aBaseDomain, const nsID& aCacheId);
@@ -36,6 +38,9 @@ public:
 
   nsresult Put(cache::RequestId aRequestId, const PCacheRequest& aRequest,
                const PCacheResponse& aResponse);
+
+  nsresult Delete(cache::RequestId aRequestId, const PCacheRequest& aRequest,
+                  const PCacheQueryParams& aParams);
 
 private:
   CacheDBConnection(CacheDBListener& aListener,
@@ -54,13 +59,12 @@ private:
     PCacheResponse response;
   };
 
-  typedef int32_t EntryId;
-
   nsresult QueryCache(const PCacheRequest& aRequest,
                       const PCacheQueryParams& aParams,
                       nsTArray<EntryId>& aEntryIdListOut);
   bool MatchByVaryHeader(const PCacheRequest& aRequest, int32_t entryId);
-  nsresult DeleteEntry(int32_t aEntryId);
+  nsresult DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
+                         uint32_t aPos=0, int32_t aLen=-1);
   nsresult InsertEntry(const PCacheRequest& aRequest,
                        const PCacheResponse& aResponse);
 

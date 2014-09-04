@@ -26,6 +26,7 @@ class CacheDBListener
                             const nsTArray<PCacheResponse>& aResponses)=0;
     virtual void OnPut(cache::RequestId aRequestId,
                        const PCacheResponseOrVoid& aResponse)=0;
+    virtual void OnDelete(cache::RequestId aRequestId, bool aResult)=0;
 
     // TODO: OnConnected
     // TODO: OnError (or pass nsresult in each On*() method?

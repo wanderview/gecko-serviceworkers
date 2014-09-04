@@ -59,6 +59,8 @@ public:
   virtual void
   OnPut(cache::RequestId aRequestId,
         const PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
+  virtual void
+  OnDelete(cache::RequestId aRequestId, bool aResult) MOZ_OVERRIDE;
 
 private:
   const nsCString mOrigin;

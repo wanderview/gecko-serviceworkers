@@ -90,7 +90,13 @@ CacheParent::RecvDelete(const RequestId& aRequestId,
                         const PCacheRequest& aRequest,
                         const PCacheQueryParams& aParams)
 {
-  return false;
+  MOZ_ASSERT(mDBConnection);
+  nsresult rv = mDBConnection->Delete(aRequestId, aRequest, aParams);
+  if (NS_FAILED(rv)) {
+    unused << SendDeleteResponse(aRequestId, false);
+  }
+
+  return true;
 }
 
 bool
@@ -112,6 +118,12 @@ void
 CacheParent::OnPut(RequestId aRequestId, const PCacheResponseOrVoid& aResponse)
 {
   unused << SendPutResponse(aRequestId, aResponse);
+}
+
+void
+CacheParent::OnDelete(RequestId aRequestId, bool aResult)
+{
+  unused << SendDeleteResponse(aRequestId, aResult);
 }
 
 } // namespace dom
