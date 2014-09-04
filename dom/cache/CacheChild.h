@@ -30,7 +30,7 @@ public:
   // PCacheChild methods
   virtual bool
   RecvMatchResponse(const RequestId& requestId,
-                    const PCacheResponse& response) MOZ_OVERRIDE;
+                    const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
   virtual bool
   RecvMatchAllResponse(const RequestId& requestId,
                        const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;

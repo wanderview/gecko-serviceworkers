@@ -28,6 +28,8 @@ using mozilla::dom::quota::PERSISTENCE_TYPE_PERSISTENT;
 using mozilla::dom::quota::PersistenceType;
 using mozilla::dom::quota::QuotaManager;
 
+static const int32_t MAX_ENTRIES_PER_STATEMENT = 255;
+
 static void
 AppendListParamsToQuery(nsACString& aQuery,
                         const nsTArray<CacheDBConnection::EntryId>& aEntryIdList,
@@ -99,16 +101,56 @@ CacheDBConnection::~CacheDBConnection()
 }
 
 nsresult
+CacheDBConnection::Match(cache::RequestId aRequestId,
+                         const PCacheRequest& aRequest,
+                         const PCacheQueryParams& aParams)
+{
+  nsTArray<EntryId> matches;
+  nsresult rv = QueryCache(aRequest, aParams, matches);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  PCacheResponseOrVoid responseOrVoid;
+
+  if (matches.Length() < 1) {
+    responseOrVoid = void_t();
+    mListener.OnMatch(aRequestId, responseOrVoid);
+    return NS_OK;
+  }
+
+  PCacheResponse response;
+  rv = ReadResponse(matches[0], response);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  responseOrVoid = response;
+  mListener.OnMatch(aRequestId, responseOrVoid);
+
+  return NS_OK;
+}
+
+nsresult
 CacheDBConnection::MatchAll(RequestId aRequestId,
                             const PCacheRequestOrVoid& aRequest,
                             const PCacheQueryParams& aParams)
 {
   nsTArray<PCacheResponse> responses;
+  nsTArray<EntryId> matches;
+  nsresult rv;
 
   if (aRequest.type() == PCacheRequestOrVoid::Tvoid_t) {
-    // TODO: Get all responses
+    rv = QueryAll(matches);
+    NS_ENSURE_SUCCESS(rv, rv);
   } else {
-    // TODO: Run QueryCache algorithm
+    rv = QueryCache(aRequest, aParams, matches);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  // TODO: replace this with a bulk load using SQL IN clause
+  for (uint32_t i = 0; i < matches.Length(); ++i) {
+    PCacheResponse *response = responses.AppendElement();
+    NS_ENSURE_TRUE(response, NS_ERROR_OUT_OF_MEMORY);
+
+    rv = ReadResponse(matches[i], *response);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
 
   mListener.OnMatchAll(aRequestId, responses);
@@ -347,6 +389,26 @@ CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
 }
 
 nsresult
+CacheDBConnection::QueryAll(nsTArray<EntryId>& aEntryIdListOut)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT id FROM map"
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  bool hasMoreData;
+  while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
+    EntryId* entryId = aEntryIdListOut.AppendElement();
+    NS_ENSURE_TRUE(entryId, NS_ERROR_OUT_OF_MEMORY);
+    rv = statement->GetInt32(0, entryId);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  return NS_OK;
+}
+
+nsresult
 CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
                               const PCacheQueryParams& aParams,
                               nsTArray<EntryId>& aEntryIdListOut)
@@ -388,7 +450,7 @@ CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
     query.Append(NS_LITERAL_CSTRING("=?1"));
   }
 
-  query.Append(NS_LITERAL_CSTRING(" GROUP BY map.id"));
+  query.Append(NS_LITERAL_CSTRING(" GROUP BY map.id ORDER BY map.id"));
 
   nsCOMPtr<mozIStorageStatement> statement;
   nsresult rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
@@ -408,14 +470,11 @@ CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
   while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
     EntryId entryId;
     rv = statement->GetInt32(0, &entryId);
-    if (NS_FAILED(rv)) {
-      continue;
-    }
+    NS_ENSURE_SUCCESS(rv, rv);
+
     int32_t varyCount;
     rv = statement->GetInt32(1, &varyCount);
-    if (NS_FAILED(rv)) {
-      continue;
-    }
+    NS_ENSURE_SUCCESS(rv, rv);
 
     if (!aParams.ignoreVary() && varyCount > 0 &&
         !MatchByVaryHeader(aRequest, entryId)) {
@@ -530,7 +589,6 @@ CacheDBConnection::DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
 
   // Sqlite limits the number of entries allowed for an IN clause,
   // so split up larger operations.
-  static const int32_t MAX_ENTRIES_PER_STATEMENT = 255;
   if (aLen > MAX_ENTRIES_PER_STATEMENT) {
     uint32_t curPos = aPos;
     int32_t remaining = aLen;
@@ -702,6 +760,66 @@ CacheDBConnection::InsertEntry(const PCacheRequest& aRequest,
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = statement->Execute();
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  return NS_OK;
+}
+
+nsresult
+CacheDBConnection::ReadResponse(EntryId aEntryId, PCacheResponse& aResponseOut)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT "
+      "response_type, "
+      "response_status, "
+      "response_status_text "
+    "FROM map "
+    "WHERE id=?1 "
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(0, aEntryId);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  bool hasMoreData;
+  rv = statement->ExecuteStep(&hasMoreData);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  int32_t type;
+  rv = statement->GetInt32(0, &type);
+  NS_ENSURE_SUCCESS(rv, rv);
+  aResponseOut.type() = static_cast<ResponseType>(type);
+
+  int32_t status;
+  rv = statement->GetInt32(1, &status);
+  NS_ENSURE_SUCCESS(rv, rv);
+  aResponseOut.status() = status;
+
+  rv = statement->GetUTF8String(2, aResponseOut.statusText());
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT "
+      "name, "
+      "value "
+    "FROM response_headers "
+    "WHERE map_id=?1 "
+  ), getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = statement->BindInt32Parameter(0, aEntryId);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
+    PHeadersEntry* header = aResponseOut.headers().list().AppendElement();
+    NS_ENSURE_TRUE(header, NS_ERROR_OUT_OF_MEMORY);
+
+    rv = statement->GetUTF8String(0, header->name());
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = statement->GetUTF8String(1, header->value());
     NS_ENSURE_SUCCESS(rv, rv);
   }
 

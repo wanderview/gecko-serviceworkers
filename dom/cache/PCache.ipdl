@@ -26,7 +26,7 @@ parent:
   Keys(RequestId requestId, PCacheRequestOrVoid request, PCacheQueryParams params);
 
 child:
-  MatchResponse(RequestId requestId, PCacheResponse response);
+  MatchResponse(RequestId requestId, PCacheResponseOrVoid response);
   MatchAllResponse(RequestId requestId, PCacheResponse[] responses);
   AddResponse(RequestId requestId, PCacheResponse response);
   AddAllResponse(RequestId requestId, PCacheResponse[] responses);

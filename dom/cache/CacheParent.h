@@ -54,6 +54,9 @@ public:
 
   // CacheDBListener methods
   virtual void
+  OnMatch(cache::RequestId aRequestId,
+          PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
+  virtual void
   OnMatchAll(cache::RequestId aRequestId,
              const nsTArray<PCacheResponse>& aResponses) MOZ_OVERRIDE;
   virtual void

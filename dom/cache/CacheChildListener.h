@@ -30,7 +30,7 @@ public:
 
   virtual void
   RecvMatchResponse(cache::RequestId requestId,
-                    const PCacheResponse& response)=0;
+                    const PCacheResponseOrVoid& response)=0;
   virtual void
   RecvMatchAllResponse(cache::RequestId requestId,
                        const nsTArray<PCacheResponse>& responses)=0;

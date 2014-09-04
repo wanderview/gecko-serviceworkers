@@ -32,6 +32,10 @@ public:
   Create(CacheDBListener& aListener, const nsACString& aOrigin,
          const nsACString& aBaseDomain);
 
+  nsresult Match(cache::RequestId aRequestId,
+                 const PCacheRequest& aRequest,
+                 const PCacheQueryParams& aParams);
+
   nsresult MatchAll(cache::RequestId aRequestId,
                     const PCacheRequestOrVoid& aRequest,
                     const PCacheQueryParams& aParams);
@@ -53,12 +57,7 @@ private:
                       const nsACString& aBaseDomain, const nsID& aCacheId,
                       bool allowCreate);
 
-  struct QueryResult
-  {
-    PCacheRequest request;
-    PCacheResponse response;
-  };
-
+  nsresult QueryAll(nsTArray<EntryId>& aEntryIdListOut);
   nsresult QueryCache(const PCacheRequest& aRequest,
                       const PCacheQueryParams& aParams,
                       nsTArray<EntryId>& aEntryIdListOut);
@@ -67,6 +66,7 @@ private:
                          uint32_t aPos=0, int32_t aLen=-1);
   nsresult InsertEntry(const PCacheRequest& aRequest,
                        const PCacheResponse& aResponse);
+  nsresult ReadResponse(EntryId aEntryId, PCacheResponse& aResponseOut);
 
   static const int32_t kLatestSchemaVersion = 1;
   CacheDBListener& mListener;

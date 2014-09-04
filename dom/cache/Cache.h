@@ -70,7 +70,7 @@ public:
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
   virtual void
   RecvMatchResponse(cache::RequestId requestId,
-                    const PCacheResponse& response) MOZ_OVERRIDE;
+                    const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
   virtual void
   RecvMatchAllResponse(cache::RequestId requestId,
                        const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;

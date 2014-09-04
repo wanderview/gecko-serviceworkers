@@ -22,6 +22,8 @@ class CacheDBListener
   public:
     virtual ~CacheDBListener() { }
 
+    virtual void OnMatch(cache::RequestId aRequestId,
+                         PCacheResponseOrVoid& aResponse)=0;
     virtual void OnMatchAll(cache::RequestId aRequestId,
                             const nsTArray<PCacheResponse>& aResponses)=0;
     virtual void OnPut(cache::RequestId aRequestId,

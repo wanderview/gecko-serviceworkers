@@ -47,7 +47,7 @@ CacheChild::ClearListener()
 
 bool
 CacheChild::RecvMatchResponse(const RequestId& requestId,
-                              const PCacheResponse& response)
+                              const PCacheResponseOrVoid& response)
 {
   MOZ_ASSERT(mListener);
   mListener->RecvMatchResponse(requestId, response);

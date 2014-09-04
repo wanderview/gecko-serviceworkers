@@ -432,14 +432,22 @@ Cache::ActorDestroy(mozilla::ipc::IProtocol& aActor)
 }
 
 void
-Cache::RecvMatchResponse(RequestId aRequestId, const PCacheResponse& aResponse)
+Cache::RecvMatchResponse(RequestId aRequestId,
+                         const PCacheResponseOrVoid& aResponse)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
+
+  if (aResponse.type() == PCacheResponseOrVoid::Tvoid_t) {
+    promise->MaybeReject(NS_ERROR_DOM_NOT_FOUND_ERR);
+    return;
+  }
+
   nsRefPtr<Response> response = new Response(mOwner);
-  if (NS_WARN_IF(!response)) {
+  if (!response) {
+    promise->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
     return;
   }
   ToResponse(*response, aResponse);
@@ -457,7 +465,8 @@ Cache::RecvMatchAllResponse(RequestId aRequestId,
   nsTArray<nsRefPtr<Response>> responses;
   for (uint32_t i = 0; i < aResponses.Length(); ++i) {
     nsRefPtr<Response> response = new Response(mOwner);
-    if (NS_WARN_IF(!response)) {
+    if (!response) {
+      promise->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
       return;
     }
     ToResponse(*response, aResponses[i]);
@@ -474,7 +483,8 @@ Cache::RecvAddResponse(RequestId aRequestId, const PCacheResponse& aResponse)
     return;
   }
   nsRefPtr<Response> response = new Response(mOwner);
-  if (NS_WARN_IF(!response)) {
+  if (!response) {
+    promise->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
     return;
   }
   ToResponse(*response, aResponse);
@@ -492,7 +502,8 @@ Cache::RecvAddAllResponse(RequestId aRequestId,
   nsTArray<nsRefPtr<Response>> responses;
   for (uint32_t i = 0; i < aResponses.Length(); ++i) {
     nsRefPtr<Response> response = new Response(mOwner);
-    if (NS_WARN_IF(!response)) {
+    if (!response) {
+      promise->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
       return;
     }
     ToResponse(*response, aResponses[i]);
@@ -514,7 +525,8 @@ Cache::RecvPutResponse(RequestId aRequestId,
     return;
   }
   nsRefPtr<Response> response = new Response(mOwner);
-  if (NS_WARN_IF(!response)) {
+  if (!response) {
+    promise->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
     return;
   }
   ToResponse(*response, aResponse);
@@ -544,7 +556,8 @@ Cache::RecvKeysResponse(RequestId aRequestId,
     MOZ_CRASH("not implemented - can't construct new Request()");
     //nsRefPtr<Request> request = new Request(mOwner);
     nsRefPtr<Request> request = nullptr;
-    if (NS_WARN_IF(!request)) {
+    if (!request) {
+      promise->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
       return;
     }
     ToRequest(*request, aRequests[i]);

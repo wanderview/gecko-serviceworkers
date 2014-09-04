@@ -46,7 +46,15 @@ bool
 CacheParent::RecvMatch(const RequestId& aRequestId, const PCacheRequest& aRequest,
                        const PCacheQueryParams& aParams)
 {
-  return false;
+  MOZ_ASSERT(mDBConnection);
+  nsresult rv = mDBConnection->MatchAll(aRequestId, aRequest, aParams);
+  if (NS_FAILED(rv)) {
+    PCacheResponseOrVoid responseOrVoid;
+    responseOrVoid = void_t();
+    unused << SendMatchResponse(aRequestId, responseOrVoid);
+  }
+
+  return true;
 }
 
 bool
@@ -54,7 +62,14 @@ CacheParent::RecvMatchAll(const RequestId& aRequestId,
                           const PCacheRequestOrVoid& aRequest,
                           const PCacheQueryParams& aParams)
 {
-  return false;
+  MOZ_ASSERT(mDBConnection);
+  nsresult rv = mDBConnection->MatchAll(aRequestId, aRequest, aParams);
+  if (NS_FAILED(rv)) {
+    nsTArray<PCacheResponse> emptyResponses;
+    unused << SendMatchAllResponse(aRequestId, emptyResponses);
+  }
+
+  return true;
 }
 
 bool
@@ -105,6 +120,13 @@ CacheParent::RecvKeys(const RequestId& aRequestId,
                       const PCacheQueryParams& aParams)
 {
   return false;
+}
+
+void
+CacheParent::OnMatch(cache::RequestId aRequestId,
+                     PCacheResponseOrVoid& aResponse)
+{
+  unused << SendMatchResponse(aRequestId, aResponse);
 }
 
 void
