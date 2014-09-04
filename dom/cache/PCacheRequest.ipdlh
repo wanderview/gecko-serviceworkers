@@ -6,19 +6,25 @@ include PHeaders;
 
 using RequestCredentials from "mozilla/dom/Request.h";
 using RequestMode from "mozilla/dom/Request.h";
+using struct mozilla::void_t from "ipc/IPCMessageUtils.h";
 
 namespace mozilla {
 namespace dom {
 
 struct PCacheRequest
 {
-  bool null;
   nsCString method;
   nsString url;
   nsString urlWithoutQuery;
   PHeaders headers;
   RequestMode mode;
   RequestCredentials credentials;
+};
+
+union PCacheRequestOrVoid
+{
+  void_t;
+  PCacheRequest;
 };
 
 } // namespace dom

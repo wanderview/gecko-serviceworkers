@@ -34,7 +34,7 @@ public:
   RecvMatch(const RequestId& aRequestId, const PCacheRequest& aRequest,
             const PCacheQueryParams& aParams) MOZ_OVERRIDE;
   virtual bool
-  RecvMatchAll(const RequestId& aRequestId, const PCacheRequest& aRequest,
+  RecvMatchAll(const RequestId& aRequestId, const PCacheRequestOrVoid& aRequest,
                const PCacheQueryParams& aParams) MOZ_OVERRIDE;
   virtual bool
   RecvAdd(const RequestId& aRequestId,
@@ -49,7 +49,7 @@ public:
   RecvDelete(const RequestId& aRequestId, const PCacheRequest& aRequest,
              const PCacheQueryParams& aParams) MOZ_OVERRIDE;
   virtual bool
-  RecvKeys(const RequestId& aRequestId, const PCacheRequest& aRequest,
+  RecvKeys(const RequestId& aRequestId, const PCacheRequestOrVoid& aRequest,
            const PCacheQueryParams& aParams) MOZ_OVERRIDE;
 
   // CacheDBListener methods
@@ -58,7 +58,7 @@ public:
              const nsTArray<PCacheResponse>& aResponses) MOZ_OVERRIDE;
   virtual void
   OnPut(cache::RequestId aRequestId,
-        const PCacheResponse& aResponse) MOZ_OVERRIDE;
+        const PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
 
 private:
   const nsCString mOrigin;

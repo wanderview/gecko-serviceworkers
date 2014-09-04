@@ -15,7 +15,7 @@ interface Cache {
   Promise<Response> match((Request or ScalarValueString) request,
                           optional QueryParams params);
   [Throws]
-  Promise<sequence<Response>> matchAll((Request or ScalarValueString) request,
+  Promise<sequence<Response>> matchAll(optional (Request or ScalarValueString) request,
                                        optional QueryParams params);
   [Throws]
   Promise<Response> add((Request or ScalarValueString) request);

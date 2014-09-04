@@ -71,12 +71,13 @@ CacheDBConnection::~CacheDBConnection()
 }
 
 nsresult
-CacheDBConnection::MatchAll(RequestId aRequestId, const PCacheRequest& aRequest,
+CacheDBConnection::MatchAll(RequestId aRequestId,
+                            const PCacheRequestOrVoid& aRequest,
                             const PCacheQueryParams& aParams)
 {
   nsTArray<PCacheResponse> responses;
 
-  if (aRequest.null()) {
+  if (aRequest.type() == PCacheRequestOrVoid::Tvoid_t) {
     // TODO: Get all responses
   } else {
     // TODO: Run QueryCache algorithm
@@ -92,12 +93,9 @@ nsresult
 CacheDBConnection::Put(RequestId aRequestId, const PCacheRequest& aRequest,
                        const PCacheResponse& aResponse)
 {
-  if (aResponse.null() || !aRequest.method().LowerCaseEqualsLiteral("get")) {
+  if (!aRequest.method().LowerCaseEqualsLiteral("get")) {
     return NS_ERROR_FAILURE;
   }
-
-  PCacheResponse response;
-  response.null() = true;
 
   PCacheQueryParams params;
 
@@ -119,9 +117,9 @@ CacheDBConnection::Put(RequestId aRequestId, const PCacheRequest& aRequest,
   rv = trans.Commit();
   NS_ENSURE_SUCCESS(rv, rv);
 
-  response = aResponse;
-
+  PCacheResponseOrVoid response(aResponse);
   mListener.OnPut(aRequestId, response);
+
   return NS_OK;
 }
 

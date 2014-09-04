@@ -83,7 +83,7 @@ CacheChild::RecvAddAllResponse(const RequestId& requestId,
 
 bool
 CacheChild::RecvPutResponse(const RequestId& requestId,
-                            const PCacheResponse& response)
+                            const PCacheResponseOrVoid& response)
 {
   MOZ_ASSERT(mListener);
   mListener->RecvPutResponse(requestId, response);

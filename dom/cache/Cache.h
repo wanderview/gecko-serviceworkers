@@ -43,7 +43,7 @@ public:
   Match(const RequestOrScalarValueString& aRequest, const QueryParams& aParams,
         ErrorResult& aRv);
   already_AddRefed<Promise>
-  MatchAll(const RequestOrScalarValueString& aRequest,
+  MatchAll(const Optional<RequestOrScalarValueString>& aRequest,
            const QueryParams& aParams, ErrorResult& aRv);
   already_AddRefed<Promise>
   Add(const RequestOrScalarValueString& aRequest, ErrorResult& aRv);
@@ -82,7 +82,7 @@ public:
                      const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
   virtual void
   RecvPutResponse(cache::RequestId requestId,
-                  const PCacheResponse& response) MOZ_OVERRIDE;
+                  const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
   virtual void
   RecvDeleteResponse(cache::RequestId requestId, bool result) MOZ_OVERRIDE;
   virtual void

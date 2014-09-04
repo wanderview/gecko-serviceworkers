@@ -23,6 +23,7 @@ namespace dom {
 
 using mozilla::ErrorResult;
 using mozilla::unused;
+using mozilla::void_t;
 using mozilla::dom::cache::INVALID_REQUEST_ID;
 using mozilla::dom::cache::RequestId;
 
@@ -82,7 +83,6 @@ ToPCacheRequest(PCacheRequest& aOut, const Request& aIn)
   aOut.headers() = headers->AsPHeaders();
   aOut.mode() = aIn.Mode();
   aOut.credentials() = aIn.Credentials();
-  aOut.null() = false;
 }
 
 static void
@@ -100,14 +100,16 @@ ToPCacheRequest(PCacheRequest& aOut, const RequestOrScalarValueString& aIn)
 }
 
 static void
-ToPCacheRequest(PCacheRequest& aOut,
-                const Optional<RequestOrScalarValueString>& aIn)
+ToPCacheRequestOrVoid(PCacheRequestOrVoid& aOut,
+                      const Optional<RequestOrScalarValueString>& aIn)
 {
   if (!aIn.WasPassed()) {
-    aOut.null() = true;
+    aOut = void_t();
     return;
   }
-  ToPCacheRequest(aOut, aIn.Value());
+  PCacheRequest request;
+  ToPCacheRequest(request, aIn.Value());
+  aOut = request;
 }
 
 static void
@@ -127,7 +129,6 @@ ToPCacheRequest(PCacheRequest& aOut,
 static void
 ToPCacheResponse(PCacheResponse& aOut, const Response& aIn)
 {
-  aOut.null() = false;
   aOut.type() = aIn.Type();
   aOut.status() = aIn.Status();
   aIn.GetStatusText(aOut.statusText());
@@ -218,7 +219,7 @@ Cache::Match(const RequestOrScalarValueString& aRequest,
 }
 
 already_AddRefed<Promise>
-Cache::MatchAll(const RequestOrScalarValueString& aRequest,
+Cache::MatchAll(const Optional<RequestOrScalarValueString>& aRequest,
                 const QueryParams& aParams, ErrorResult& aRv)
 {
   MOZ_ASSERT(mActor);
@@ -233,8 +234,8 @@ Cache::MatchAll(const RequestOrScalarValueString& aRequest,
     return nullptr;
   }
 
-  PCacheRequest request;
-  ToPCacheRequest(request, aRequest);
+  PCacheRequestOrVoid request;
+  ToPCacheRequestOrVoid(request, aRequest);
 
   PCacheQueryParams params;
   ToPCacheQueryParams(params, aParams);
@@ -368,8 +369,8 @@ Cache::Keys(const Optional<RequestOrScalarValueString>& aRequest,
     return nullptr;
   }
 
-  PCacheRequest request;
-  ToPCacheRequest(request, aRequest);
+  PCacheRequestOrVoid request;
+  ToPCacheRequestOrVoid(request, aRequest);
 
   PCacheQueryParams params;
   ToPCacheQueryParams(params, aParams);
@@ -501,13 +502,14 @@ Cache::RecvAddAllResponse(RequestId aRequestId,
 }
 
 void
-Cache::RecvPutResponse(RequestId aRequestId, const PCacheResponse& aResponse)
+Cache::RecvPutResponse(RequestId aRequestId,
+                       const PCacheResponseOrVoid& aResponse)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
-  if (aResponse.null()) {
+  if (aResponse.type() == PCacheResponseOrVoid::Tvoid_t) {
     promise->MaybeResolve(nullptr);
     return;
   }

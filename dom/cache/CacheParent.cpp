@@ -12,6 +12,7 @@
 namespace mozilla {
 namespace dom {
 
+using mozilla::void_t;
 using mozilla::dom::cache::RequestId;
 
 CacheParent::CacheParent(const nsACString& aOrigin,
@@ -50,7 +51,7 @@ CacheParent::RecvMatch(const RequestId& aRequestId, const PCacheRequest& aReques
 
 bool
 CacheParent::RecvMatchAll(const RequestId& aRequestId,
-                          const PCacheRequest& aRequest,
+                          const PCacheRequestOrVoid& aRequest,
                           const PCacheQueryParams& aParams)
 {
   return false;
@@ -76,9 +77,8 @@ CacheParent::RecvPut(const RequestId& aRequestId, const PCacheRequest& aRequest,
   MOZ_ASSERT(mDBConnection);
   nsresult rv = mDBConnection->Put(aRequestId, aRequest, aResponse);
   if (NS_FAILED(rv)) {
-    PCacheResponse response;
-    response.null() = true;
-    response.type() = ResponseType::Default;
+    PCacheResponseOrVoid response;
+    response = void_t();
     unused << SendPutResponse(aRequestId, response);
   }
 
@@ -94,7 +94,8 @@ CacheParent::RecvDelete(const RequestId& aRequestId,
 }
 
 bool
-CacheParent::RecvKeys(const RequestId& aRequestId, const PCacheRequest& aRequest,
+CacheParent::RecvKeys(const RequestId& aRequestId,
+                      const PCacheRequestOrVoid& aRequest,
                       const PCacheQueryParams& aParams)
 {
   return false;
@@ -108,7 +109,7 @@ CacheParent::OnMatchAll(cache::RequestId aRequestId,
 }
 
 void
-CacheParent::OnPut(RequestId aRequestId, const PCacheResponse& aResponse)
+CacheParent::OnPut(RequestId aRequestId, const PCacheResponseOrVoid& aResponse)
 {
   unused << SendPutResponse(aRequestId, aResponse);
 }

@@ -30,7 +30,8 @@ public:
   Create(CacheDBListener& aListener, const nsACString& aOrigin,
          const nsACString& aBaseDomain);
 
-  nsresult MatchAll(cache::RequestId aRequestId, const PCacheRequest& aRequest,
+  nsresult MatchAll(cache::RequestId aRequestId,
+                    const PCacheRequestOrVoid& aRequest,
                     const PCacheQueryParams& aParams);
 
   nsresult Put(cache::RequestId aRequestId, const PCacheRequest& aRequest,

@@ -18,19 +18,19 @@ protocol PCache
 
 parent:
   Match(RequestId requestId, PCacheRequest request, PCacheQueryParams params);
-  MatchAll(RequestId requestId, PCacheRequest request, PCacheQueryParams params);
+  MatchAll(RequestId requestId, PCacheRequestOrVoid request, PCacheQueryParams params);
   Add(RequestId requestId, PCacheRequest request);
   AddAll(RequestId requestId, PCacheRequest[] requests);
   Put(RequestId requestId, PCacheRequest request, PCacheResponse response);
   Delete(RequestId requestId, PCacheRequest request, PCacheQueryParams params);
-  Keys(RequestId requestId, PCacheRequest request, PCacheQueryParams params);
+  Keys(RequestId requestId, PCacheRequestOrVoid request, PCacheQueryParams params);
 
 child:
   MatchResponse(RequestId requestId, PCacheResponse response);
   MatchAllResponse(RequestId requestId, PCacheResponse[] responses);
   AddResponse(RequestId requestId, PCacheResponse response);
   AddAllResponse(RequestId requestId, PCacheResponse[] responses);
-  PutResponse(RequestId requestId, PCacheResponse response);
+  PutResponse(RequestId requestId, PCacheResponseOrVoid response);
   DeleteResponse(RequestId requestId, bool result);
   KeysResponse(RequestId requestId, PCacheRequest[] requests);
 

@@ -42,7 +42,7 @@ public:
                      const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
   virtual bool
   RecvPutResponse(const RequestId& requestId,
-                  const PCacheResponse& response) MOZ_OVERRIDE;
+                  const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
   virtual bool
   RecvDeleteResponse(const RequestId& requestId,
                      const bool& result) MOZ_OVERRIDE;

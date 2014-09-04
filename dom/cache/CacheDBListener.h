@@ -15,6 +15,7 @@ namespace mozilla {
 namespace dom {
 
 class PCacheResponse;
+class PCacheResponseOrVoid;
 
 class CacheDBListener
 {
@@ -24,7 +25,7 @@ class CacheDBListener
     virtual void OnMatchAll(cache::RequestId aRequestId,
                             const nsTArray<PCacheResponse>& aResponses)=0;
     virtual void OnPut(cache::RequestId aRequestId,
-                       const PCacheResponse& aResponse)=0;
+                       const PCacheResponseOrVoid& aResponse)=0;
 
     // TODO: OnConnected
     // TODO: OnError (or pass nsresult in each On*() method?

@@ -20,6 +20,7 @@ namespace dom {
 
 class PCacheRequest;
 class PCacheResponse;
+class PCacheResponseOrVoid;
 
 class CacheChildListener
 {
@@ -41,7 +42,7 @@ public:
                      const nsTArray<PCacheResponse>& responses)=0;
   virtual void
   RecvPutResponse(cache::RequestId requestId,
-                  const PCacheResponse& response)=0;
+                  const PCacheResponseOrVoid& response)=0;
   virtual void
   RecvDeleteResponse(cache::RequestId requestId,
                      bool result)=0;
