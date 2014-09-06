@@ -41,7 +41,7 @@ class WorkerGlobalScope : public DOMEventTargetHelper,
 protected:
   WorkerPrivate* mWorkerPrivate;
 
-  WorkerGlobalScope(WorkerPrivate* aWorkerPrivate);
+  explicit WorkerGlobalScope(WorkerPrivate* aWorkerPrivate);
   virtual ~WorkerGlobalScope();
 
 public:
@@ -138,7 +138,7 @@ class DedicatedWorkerGlobalScope MOZ_FINAL : public WorkerGlobalScope
   ~DedicatedWorkerGlobalScope() { }
 
 public:
-  DedicatedWorkerGlobalScope(WorkerPrivate* aWorkerPrivate);
+  explicit DedicatedWorkerGlobalScope(WorkerPrivate* aWorkerPrivate);
 
   virtual JSObject*
   WrapGlobalObject(JSContext* aCx) MOZ_OVERRIDE;

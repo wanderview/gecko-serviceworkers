@@ -173,6 +173,13 @@ CompositorOGL::CleanupResources()
     mQuadVBO = 0;
   }
 
+  // On the main thread the Widget will be destroyed soon and calling MakeCurrent
+  // after that could cause a crash (at least with GLX, see bug 1059793), unless
+  // context is marked as destroyed.
+  // There may be some textures still alive that will try to call MakeCurrent on
+  // the context so let's make sure it is marked destroyed now.
+  mGLContext->MarkDestroyed();
+
   mGLContext = nullptr;
 }
 
@@ -589,6 +596,10 @@ CompositorOGL::PrepareViewport(const gfx::IntSize& aSize,
     viewMatrix.Scale(1.0f, -1.0f);
   }
 
+  if (!mTarget) {
+    viewMatrix.Translate(mRenderOffset.x, mRenderOffset.y);
+  }
+
   viewMatrix = aWorldTransform * viewMatrix;
 
   Matrix4x4 matrix3d = Matrix4x4::From2D(viewMatrix);
@@ -754,17 +765,8 @@ CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
   TexturePoolOGL::Fill(gl());
 #endif
 
-  // Make sure the render offset is respected. We ignore this when we have a
-  // target to stop tests failing - this is only used by the Android browser
-  // UI for its dynamic toolbar.
-  IntPoint origin;
-  if (!mTarget) {
-    origin = -TruncatedToInt(mRenderOffset.ToUnknownPoint());
-  }
-
   mCurrentRenderTarget =
     CompositingRenderTargetOGL::RenderTargetForWindow(this,
-                                                      origin,
                                                       IntSize(width, height),
                                                       aTransform);
   mCurrentRenderTarget->BindRenderTarget();
@@ -1023,11 +1025,12 @@ CompositorOGL::DrawQuad(const Rect& aRect,
 
   MOZ_ASSERT(mFrameInProgress, "frame not started");
 
-  IntRect intClipRect;
-  aClipRect.ToIntRect(&intClipRect);
+  Rect clipRect = aClipRect;
   if (!mTarget) {
-    intClipRect.MoveBy(mRenderOffset.x, mRenderOffset.y);
+    clipRect.MoveBy(mRenderOffset.x, mRenderOffset.y);
   }
+  IntRect intClipRect;
+  clipRect.ToIntRect(&intClipRect);
 
   gl()->fScissor(intClipRect.x, FlipY(intClipRect.y + intClipRect.height),
                  intClipRect.width, intClipRect.height);

@@ -157,6 +157,7 @@ static_assert(MAX_WORKERS_PER_DOMAIN >= 1,
 #define PREF_DOM_FETCH_ENABLED         "dom.fetch.enabled"
 #define PREF_DOM_CACHES_ENABLED        "dom.worker-caches.enabled"
 #define PREF_WORKERS_LATEST_JS_VERSION "dom.workers.latestJSVersion"
+#define PREF_INTL_ACCEPT_LANGUAGES     "intl.accept_languages"
 
 namespace {
 
@@ -919,7 +920,7 @@ class WorkerBackgroundChildCallback MOZ_FINAL :
   bool* mDone;
 
 public:
-  WorkerBackgroundChildCallback(bool* aDone)
+  explicit WorkerBackgroundChildCallback(bool* aDone)
   : mDone(aDone)
   {
     MOZ_ASSERT(!NS_IsMainThread());
@@ -956,7 +957,7 @@ class WorkerThreadPrimaryRunnable MOZ_FINAL : public nsRunnable
     nsRefPtr<RuntimeService::WorkerThread> mThread;
 
   public:
-    FinishedRunnable(already_AddRefed<RuntimeService::WorkerThread> aThread)
+    explicit FinishedRunnable(already_AddRefed<RuntimeService::WorkerThread> aThread)
     : mThread(aThread)
     {
       MOZ_ASSERT(mThread);
@@ -1026,6 +1027,20 @@ private:
   }
 };
 
+void
+PrefLanguagesChanged(const char* /* aPrefName */, void* /* aClosure */)
+{
+  AssertIsOnMainThread();
+
+  nsTArray<nsString> languages;
+  Navigator::GetAcceptLanguages(languages);
+
+  RuntimeService* runtime = RuntimeService::GetService();
+  if (runtime) {
+    runtime->UpdateAllWorkerLanguages(languages);
+  }
+}
+
 } /* anonymous namespace */
 
 class RuntimeService::WorkerThread MOZ_FINAL : public nsThread
@@ -1035,7 +1050,7 @@ class RuntimeService::WorkerThread MOZ_FINAL : public nsThread
     WorkerPrivate* mWorkerPrivate;
 
   public:
-    Observer(WorkerPrivate* aWorkerPrivate)
+    explicit Observer(WorkerPrivate* aWorkerPrivate)
     : mWorkerPrivate(aWorkerPrivate)
     {
       MOZ_ASSERT(aWorkerPrivate);
@@ -1459,6 +1474,7 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
         return false;
       }
 
+      Navigator::GetAcceptLanguages(mNavigatorProperties.mLanguages);
       mNavigatorPropertiesLoaded = true;
     }
 
@@ -1802,6 +1818,9 @@ RuntimeService::Init()
                                                    LoadRuntimeOptions,
                                                    PREF_WORKERS_OPTIONS_PREFIX,
                                                    nullptr)) ||
+      NS_FAILED(Preferences::RegisterCallbackAndCall(PrefLanguagesChanged,
+                                                     PREF_INTL_ACCEPT_LANGUAGES,
+                                                     nullptr)) ||
       NS_FAILED(Preferences::RegisterCallbackAndCall(
                                                  JSVersionChanged,
                                                  PREF_WORKERS_LATEST_JS_VERSION,
@@ -1947,6 +1966,9 @@ RuntimeService::Cleanup()
   if (mObserved) {
     if (NS_FAILED(Preferences::UnregisterCallback(JSVersionChanged,
                                                   PREF_WORKERS_LATEST_JS_VERSION,
+                                                  nullptr)) ||
+        NS_FAILED(Preferences::UnregisterCallback(PrefLanguagesChanged,
+                                                  PREF_INTL_ACCEPT_LANGUAGES,
                                                   nullptr)) ||
         NS_FAILED(Preferences::UnregisterCallback(LoadRuntimeOptions,
                                                   PREF_JS_OPTIONS_PREFIX,
@@ -2416,6 +2438,15 @@ void
 RuntimeService::UpdateAllWorkerPreference(WorkerPreference aPref, bool aValue)
 {
   BROADCAST_ALL_WORKERS(UpdatePreference, aPref, aValue);
+}
+
+void
+RuntimeService::UpdateAllWorkerLanguages(const nsTArray<nsString>& aLanguages)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  mNavigatorProperties.mLanguages = aLanguages;
+  BROADCAST_ALL_WORKERS(UpdateLanguages, aLanguages);
 }
 
 void
