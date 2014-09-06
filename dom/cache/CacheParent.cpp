@@ -123,6 +123,12 @@ CacheParent::RecvKeys(const RequestId& aRequestId,
 }
 
 void
+CacheParent::OnError(cache::RequestId aRequestId, nsresult aRv)
+{
+  MOZ_CRASH("implement me");
+}
+
+void
 CacheParent::OnMatch(cache::RequestId aRequestId,
                      PCacheResponseOrVoid& aResponse)
 {

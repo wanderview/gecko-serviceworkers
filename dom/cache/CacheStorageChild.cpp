@@ -33,10 +33,11 @@ CacheStorageChild::ActorDestroy(ActorDestroyReason aReason)
 
 bool
 CacheStorageChild::RecvGetResponse(const RequestId& aRequestId,
+                                   const nsresult& aRv,
                                    PCacheChild* aActor)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvGetResponse(aRequestId, aActor);
+  mListener->RecvGetResponse(aRequestId, aRv, aActor);
   return true;
 }
 
@@ -51,10 +52,11 @@ CacheStorageChild::RecvHasResponse(const RequestId& aRequestId,
 
 bool
 CacheStorageChild::RecvCreateResponse(const RequestId& aRequestId,
+                                      const nsresult& aRv,
                                       PCacheChild* aActor)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvCreateResponse(aRequestId, aActor);
+  mListener->RecvCreateResponse(aRequestId, aRv, aActor);
   return true;
 }
 

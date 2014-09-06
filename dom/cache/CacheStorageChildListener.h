@@ -25,10 +25,10 @@ public:
   virtual ~CacheStorageChildListener() { }
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor)=0;
   virtual void RecvGetResponse(cache::RequestId aRequestId,
-                               PCacheChild* aActor)=0;
+                               nsresult aRv, PCacheChild* aActor)=0;
   virtual void RecvHasResponse(cache::RequestId aRequestId, bool aResult)=0;
   virtual void RecvCreateResponse(cache::RequestId aRequestId,
-                                  PCacheChild* aActor)=0;
+                                  nsresult aRv, PCacheChild* aActor)=0;
   virtual void RecvDeleteResponse(cache::RequestId aRequestId, bool aResult)=0;
   virtual void RecvKeysResponse(const cache::RequestId& aRequestId,
                                 const nsTArray<nsString>& aKeys)=0;

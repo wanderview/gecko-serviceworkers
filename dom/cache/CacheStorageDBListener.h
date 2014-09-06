@@ -16,9 +16,10 @@ class CacheStorageDBListener
 {
   public:
     virtual ~CacheStorageDBListener() { }
-    virtual void OnGet(cache::RequestId aRequestId, const nsID& aCacheId)=0;
+    virtual void OnError(nsresult aRv)=0;
+    virtual void OnGet(cache::RequestId aRequestId, nsresult aRv, nsID* aCacheId)=0;
     virtual void OnHas(cache::RequestId aRequestId, bool aResult)=0;
-    virtual void OnPut(cache::RequestId aRequestId, bool aResult)=0;
+    virtual void OnPut(cache::RequestId aRequestId, nsresult aRv, bool aResult)=0;
     virtual void OnDelete(cache::RequestId aRequestId, bool aResult)=0;
     virtual void OnKeys(cache::RequestId aRequestId,
                         const nsTArray<nsString>& aKeys)=0;

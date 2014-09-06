@@ -53,6 +53,7 @@ public:
            const PCacheQueryParams& aParams) MOZ_OVERRIDE;
 
   // CacheDBListener methods
+  virtual void OnError(cache::RequestId aRequestId, nsresult aRv) MOZ_OVERRIDE;
   virtual void
   OnMatch(cache::RequestId aRequestId,
           PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;

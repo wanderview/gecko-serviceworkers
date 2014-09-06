@@ -22,9 +22,9 @@ parent:
   Keys(RequestId aRequestId);
 
 child:
-  GetResponse(RequestId aRequestId, nullable PCache aActor);
+  GetResponse(RequestId aRequestId, nsresult aRv, nullable PCache aActor);
   HasResponse(RequestId aRequestId, bool aResult);
-  CreateResponse(RequestId aRequestId, nullable PCache aActor);
+  CreateResponse(RequestId aRequestId, nsresult aRv, nullable PCache aActor);
   DeleteResponse(RequestId aRequestId, bool aResult);
   KeysResponse(RequestId aRequestId, nsString[] aKeys);
 

@@ -22,37 +22,41 @@ class CacheStorageDBListener;
 class CacheStorageDBConnection MOZ_FINAL
 {
 public:
-  static already_AddRefed<CacheStorageDBConnection>
-  Get(CacheStorageDBListener& aListener, cache::Namespace aNamespace,
-      const nsACString& aOrigin, const nsACString& aBaseDomain);
+  CacheStorageDBConnection(CacheStorageDBListener& aListener,
+                           cache::Namespace aNamespace,
+                           const nsACString& aOrigin,
+                           const nsACString& aBaseDomain,
+                           bool aAllowCreate);
 
-  static already_AddRefed<CacheStorageDBConnection>
-  GetOrCreate(CacheStorageDBListener& aListener, cache::Namespace aNamespace,
-              const nsACString& aOrigin, const nsACString& aBaseDomain);
-
-  nsresult Get(cache::RequestId aRequestId, const nsAString& aKey);
+  void Get(cache::RequestId aRequestId, const nsAString& aKey);
   nsresult Has(cache::RequestId aRequestId, const nsAString& aKey);
-  nsresult Put(cache::RequestId aRequestId, const nsAString& aKey,
-               const nsID& aCacheId);
+  void Put(cache::RequestId aRequestId, const nsAString& aKey,
+           const nsID& aCacheId);
   nsresult Delete(cache::RequestId aRequestId, const nsAString& aKey);
   nsresult Keys(cache::RequestId aRequestId);
 
 private:
-  CacheStorageDBConnection(CacheStorageDBListener& aListener,
-                           cache::Namespace aNamespace,
-                           already_AddRefed<mozIStorageConnection> aConnection);
-  ~CacheStorageDBConnection();
+  class OpenRunnable;
+  class GetRunnable;
+  class PutRunnable;
 
-  static already_AddRefed<CacheStorageDBConnection>
-  GetOrCreateInternal(CacheStorageDBListener& aListener,
-                      cache::Namespace aNamespace, const nsACString& aOrigin,
-                      const nsACString& aBaseDomain, bool allowCreate);
+  ~CacheStorageDBConnection();
+  void OnOpenComplete(nsresult aRv,
+                      already_AddRefed<mozIStorageConnection> aConnection);
+  void OnGetComplete(cache::RequestId aRequestId, nsresult aRv, nsID* aCacheId);
+  void OnPutComplete(cache::RequestId aRequestId, nsresult aRv, bool aSuccess);
+
+  void ReportError(nsresult aRv);
 
   static const int32_t kLatestSchemaVersion = 1;
 
   CacheStorageDBListener& mListener;
   const cache::Namespace mNamespace;
+  const nsCString mOrigin;
+  const nsCString mBaseDomain;
+  nsCOMPtr<nsIThread> mOwningThread;
   nsCOMPtr<mozIStorageConnection> mConnection;
+  bool mFailed;
 
 public:
   NS_INLINE_DECL_REFCOUNTING(CacheStorageDBConnection)

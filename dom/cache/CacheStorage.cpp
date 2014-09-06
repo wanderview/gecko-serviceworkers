@@ -238,7 +238,8 @@ CacheStorage::ActorDestroy(IProtocol& aActor)
 }
 
 void
-CacheStorage::RecvGetResponse(uint64_t aRequestId, PCacheChild* aActor)
+CacheStorage::RecvGetResponse(RequestId aRequestId, nsresult aRv,
+                              PCacheChild* aActor)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
@@ -246,6 +247,10 @@ CacheStorage::RecvGetResponse(uint64_t aRequestId, PCacheChild* aActor)
       PCacheChild::Send__delete__(aActor);
     }
     return;
+  }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
   }
 
   if (!aActor) {
@@ -269,13 +274,19 @@ CacheStorage::RecvHasResponse(RequestId aRequestId, bool aResult)
 }
 
 void
-CacheStorage::RecvCreateResponse(uint64_t aRequestId, PCacheChild* aActor)
+CacheStorage::RecvCreateResponse(RequestId aRequestId, nsresult aRv,
+                                 PCacheChild* aActor)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     if (aActor) {
       PCacheChild::Send__delete__(aActor);
     }
+    return;
+  }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
     return;
   }
 

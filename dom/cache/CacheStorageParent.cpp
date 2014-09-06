@@ -41,13 +41,11 @@ CacheStorageParent::RecvGet(const RequestId& aRequestId, const nsString& aKey)
 {
   CacheStorageDBConnection *conn = GetDBConnection();
   if (!conn) {
-    unused << SendGetResponse(aRequestId, nullptr);
+    unused << SendGetResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY, nullptr);
     return true;
   }
 
-  if(NS_FAILED(conn->Get(aRequestId, aKey))) {
-    unused << SendGetResponse(aRequestId, nullptr);
-  }
+  conn->Get(aRequestId, aKey);
 
   return true;
 }
@@ -74,7 +72,7 @@ CacheStorageParent::RecvCreate(const RequestId& aRequestId,
 {
   CacheStorageDBConnection *conn = GetOrCreateDBConnection();
   if (NS_WARN_IF(!conn)) {
-    unused << SendCreateResponse(aRequestId, nullptr);
+    unused << SendCreateResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY, nullptr);
     return true;
   }
 
@@ -83,9 +81,7 @@ CacheStorageParent::RecvCreate(const RequestId& aRequestId,
   // TODO: get uuid from cache object
   nsID uuid;
 
-  if(NS_FAILED(conn->Put(aRequestId, aKey, uuid))) {
-    unused << SendCreateResponse(aRequestId, nullptr);
-  }
+  conn->Put(aRequestId, aKey, uuid);
 
   return true;
 }
@@ -124,15 +120,27 @@ CacheStorageParent::RecvKeys(const RequestId& aRequestId)
 }
 
 void
-CacheStorageParent::OnGet(RequestId aRequestId, const nsID& aCacheId)
+CacheStorageParent::OnError(nsresult aRv)
 {
+  MOZ_CRASH("implement me");
+}
+
+void
+CacheStorageParent::OnGet(cache::RequestId aRequestId, nsresult aRv,
+                          nsID* aCacheId)
+{
+  if (NS_FAILED(aRv) || !aCacheId) {
+    unused << SendGetResponse(aRequestId, aRv, nullptr);
+  }
+
+  // TODO: create cache parent for given uuid
   CacheParent* actor = new CacheParent(mOrigin, mBaseDomain);
   if (actor) {
     PCacheParent* base = Manager()->SendPCacheConstructor(actor, mOrigin,
                                                           mBaseDomain);
     actor = static_cast<CacheParent*>(base);
   }
-  unused << SendGetResponse(aRequestId, actor);
+  unused << SendGetResponse(aRequestId, aRv, actor);
 }
 
 void
@@ -142,10 +150,14 @@ CacheStorageParent::OnHas(RequestId aRequestId, bool aResult)
 }
 
 void
-CacheStorageParent::OnPut(RequestId aRequestId, bool aResult)
+CacheStorageParent::OnPut(RequestId aRequestId, nsresult aRv, bool aSuccess)
 {
+  if (NS_FAILED(aRv)) {
+    unused << SendCreateResponse(aRequestId, aRv, nullptr);
+  }
+
   CacheParent* actor = nullptr;
-  if (aResult) {
+  if (aSuccess) {
     // TODO: retrieve DB-backed actor for uuid generated in RecvCreate()
     actor = new CacheParent(mOrigin, mBaseDomain);
     if (actor) {
@@ -154,7 +166,7 @@ CacheStorageParent::OnPut(RequestId aRequestId, bool aResult)
       actor = static_cast<CacheParent*>(base);
     }
   }
-  unused << SendCreateResponse(aRequestId, actor);
+  unused << SendCreateResponse(aRequestId, aRv, actor);
 }
 
 void
@@ -175,8 +187,8 @@ CacheStorageDBConnection*
 CacheStorageParent::GetDBConnection()
 {
   if (!mDBConnection) {
-    mDBConnection = CacheStorageDBConnection::Get(*this, mNamespace, mOrigin,
-                                                  mBaseDomain);
+    mDBConnection = new CacheStorageDBConnection(*this, mNamespace, mOrigin,
+                                                 mBaseDomain, false);
   }
 
   return mDBConnection;
@@ -186,8 +198,8 @@ CacheStorageDBConnection*
 CacheStorageParent::GetOrCreateDBConnection()
 {
   if (!mDBConnection) {
-    mDBConnection = CacheStorageDBConnection::GetOrCreate(*this, mNamespace,
-                                                          mOrigin, mBaseDomain);
+    mDBConnection = new CacheStorageDBConnection(*this, mNamespace, mOrigin,
+                                                 mBaseDomain, true);
   }
 
   return mDBConnection;

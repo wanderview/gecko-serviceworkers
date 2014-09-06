@@ -23,10 +23,12 @@ public:
   virtual ~CacheStorageChild();
   virtual void ActorDestroy(ActorDestroyReason aReason) MOZ_OVERRIDE;
   virtual bool RecvGetResponse(const cache::RequestId& aRequestId,
+                               const nsresult& aRv,
                                PCacheChild* aActor) MOZ_OVERRIDE;
   virtual bool RecvHasResponse(const cache::RequestId& aRequestId,
                                const bool& aResult) MOZ_OVERRIDE;
   virtual bool RecvCreateResponse(const cache::RequestId& aRequestId,
+                                  const nsresult& aRv,
                                   PCacheChild* aActor) MOZ_OVERRIDE;
   virtual bool RecvDeleteResponse(const cache::RequestId& aRequestId,
                                   const bool& aResult) MOZ_OVERRIDE;
