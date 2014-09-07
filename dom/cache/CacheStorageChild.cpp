@@ -43,10 +43,11 @@ CacheStorageChild::RecvGetResponse(const RequestId& aRequestId,
 
 bool
 CacheStorageChild::RecvHasResponse(const RequestId& aRequestId,
-                                   const bool& aResult)
+                                   const nsresult& aRv,
+                                   const bool& aSuccess)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvHasResponse(aRequestId, aResult);
+  mListener->RecvHasResponse(aRequestId, aRv, aSuccess);
   return true;
 }
 
@@ -62,19 +63,21 @@ CacheStorageChild::RecvCreateResponse(const RequestId& aRequestId,
 
 bool
 CacheStorageChild::RecvDeleteResponse(const RequestId& aRequestId,
+                                      const nsresult& aRv,
                                       const bool& aResult)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvDeleteResponse(aRequestId, aResult);
+  mListener->RecvDeleteResponse(aRequestId, aRv, aResult);
   return true;
 }
 
 bool
 CacheStorageChild::RecvKeysResponse(const RequestId& aRequestId,
+                                    const nsresult& aRv,
                                     const nsTArray<nsString>& aKeys)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvKeysResponse(aRequestId, aKeys);
+  mListener->RecvKeysResponse(aRequestId, aRv, aKeys);
   return true;
 }
 

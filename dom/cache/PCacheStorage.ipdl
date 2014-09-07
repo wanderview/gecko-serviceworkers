@@ -23,10 +23,10 @@ parent:
 
 child:
   GetResponse(RequestId aRequestId, nsresult aRv, nullable PCache aActor);
-  HasResponse(RequestId aRequestId, bool aResult);
+  HasResponse(RequestId aRequestId, nsresult aRv, bool aSuccess);
   CreateResponse(RequestId aRequestId, nsresult aRv, nullable PCache aActor);
-  DeleteResponse(RequestId aRequestId, bool aResult);
-  KeysResponse(RequestId aRequestId, nsString[] aKeys);
+  DeleteResponse(RequestId aRequestId, nsresult aRv, bool aSuccess);
+  KeysResponse(RequestId aRequestId, nsresult aRv, nsString[] aKeys);
 
 both:
   __delete__();

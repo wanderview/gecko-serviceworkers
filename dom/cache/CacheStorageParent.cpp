@@ -27,13 +27,16 @@ CacheStorageParent::CacheStorageParent(cache::Namespace aNamespace,
 
 CacheStorageParent::~CacheStorageParent()
 {
-  // TODO: Make sure any pending CacheStorageDBConnection calls are
-  //       canceled or we clear ourself as a listener
+  MOZ_ASSERT(!mDBConnection);
 }
 
 void
 CacheStorageParent::ActorDestroy(ActorDestroyReason aReason)
 {
+  if (mDBConnection) {
+    mDBConnection->ClearListener();
+    mDBConnection = nullptr;
+  }
 }
 
 bool
@@ -55,13 +58,11 @@ CacheStorageParent::RecvHas(const RequestId& aRequestId, const nsString& aKey)
 {
   CacheStorageDBConnection *conn = GetDBConnection();
   if (!conn) {
-    unused << SendHasResponse(aRequestId, false);
+    unused << SendHasResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY, false);
     return true;
   }
 
-  if(NS_FAILED(conn->Has(aRequestId, aKey))) {
-    unused << SendHasResponse(aRequestId, false);
-  }
+  conn->Has(aRequestId, aKey);
 
   return true;
 }
@@ -92,13 +93,11 @@ CacheStorageParent::RecvDelete(const RequestId& aRequestId,
 {
   CacheStorageDBConnection *conn = GetDBConnection();
   if (!conn) {
-    unused << SendDeleteResponse(aRequestId, false);
+    unused << SendDeleteResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY, false);
     return true;
   }
 
-  if (NS_FAILED(conn->Delete(aRequestId, aKey))) {
-    unused << SendDeleteResponse(aRequestId, false);
-  }
+  conn->Delete(aRequestId, aKey);
 
   return true;
 }
@@ -108,21 +107,14 @@ CacheStorageParent::RecvKeys(const RequestId& aRequestId)
 {
   CacheStorageDBConnection *conn = GetDBConnection();
   if (!conn) {
-    unused << SendKeysResponse(aRequestId, nsTArray<nsString>());
+    unused << SendKeysResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY,
+                               nsTArray<nsString>());
     return true;
   }
 
-  if (NS_FAILED(conn->Keys(aRequestId))) {
-    unused << SendKeysResponse(aRequestId, nsTArray<nsString>());
-  }
+  conn->Keys(aRequestId);
 
   return true;
-}
-
-void
-CacheStorageParent::OnError(nsresult aRv)
-{
-  MOZ_CRASH("implement me");
 }
 
 void
@@ -131,6 +123,7 @@ CacheStorageParent::OnGet(cache::RequestId aRequestId, nsresult aRv,
 {
   if (NS_FAILED(aRv) || !aCacheId) {
     unused << SendGetResponse(aRequestId, aRv, nullptr);
+    return;
   }
 
   // TODO: create cache parent for given uuid
@@ -144,9 +137,9 @@ CacheStorageParent::OnGet(cache::RequestId aRequestId, nsresult aRv,
 }
 
 void
-CacheStorageParent::OnHas(RequestId aRequestId, bool aResult)
+CacheStorageParent::OnHas(RequestId aRequestId, nsresult aRv, bool aSuccess)
 {
-  unused << SendHasResponse(aRequestId, aResult);
+  unused << SendHasResponse(aRequestId, aRv, aSuccess);
 }
 
 void
@@ -154,6 +147,7 @@ CacheStorageParent::OnPut(RequestId aRequestId, nsresult aRv, bool aSuccess)
 {
   if (NS_FAILED(aRv)) {
     unused << SendCreateResponse(aRequestId, aRv, nullptr);
+    return;
   }
 
   CacheParent* actor = nullptr;
@@ -170,16 +164,16 @@ CacheStorageParent::OnPut(RequestId aRequestId, nsresult aRv, bool aSuccess)
 }
 
 void
-CacheStorageParent::OnDelete(RequestId aRequestId, bool aResult)
+CacheStorageParent::OnDelete(RequestId aRequestId, nsresult aRv, bool aSuccess)
 {
-  unused << SendDeleteResponse(aRequestId, aResult);
+  unused << SendDeleteResponse(aRequestId, aRv, aSuccess);
 }
 
 void
-CacheStorageParent::OnKeys(RequestId aRequestId,
+CacheStorageParent::OnKeys(RequestId aRequestId, nsresult aRv,
                            const nsTArray<nsString>& aKeys)
 {
-  unused << SendKeysResponse(aRequestId, aKeys);
+  unused << SendKeysResponse(aRequestId, aRv, aKeys);
 }
 
 
@@ -187,7 +181,7 @@ CacheStorageDBConnection*
 CacheStorageParent::GetDBConnection()
 {
   if (!mDBConnection) {
-    mDBConnection = new CacheStorageDBConnection(*this, mNamespace, mOrigin,
+    mDBConnection = new CacheStorageDBConnection(this, mNamespace, mOrigin,
                                                  mBaseDomain, false);
   }
 
@@ -198,7 +192,7 @@ CacheStorageDBConnection*
 CacheStorageParent::GetOrCreateDBConnection()
 {
   if (!mDBConnection) {
-    mDBConnection = new CacheStorageDBConnection(*this, mNamespace, mOrigin,
+    mDBConnection = new CacheStorageDBConnection(this, mNamespace, mOrigin,
                                                  mBaseDomain, true);
   }
 

@@ -26,13 +26,16 @@ public:
                                const nsresult& aRv,
                                PCacheChild* aActor) MOZ_OVERRIDE;
   virtual bool RecvHasResponse(const cache::RequestId& aRequestId,
-                               const bool& aResult) MOZ_OVERRIDE;
+                               const nsresult& aRv,
+                               const bool& aSuccess) MOZ_OVERRIDE;
   virtual bool RecvCreateResponse(const cache::RequestId& aRequestId,
                                   const nsresult& aRv,
                                   PCacheChild* aActor) MOZ_OVERRIDE;
   virtual bool RecvDeleteResponse(const cache::RequestId& aRequestId,
+                                  const nsresult& aRv,
                                   const bool& aResult) MOZ_OVERRIDE;
   virtual bool RecvKeysResponse(const cache::RequestId& aRequestId,
+                                const nsresult& aRv,
                                 const nsTArray<nsString>& aKeys) MOZ_OVERRIDE;
 
   void ClearListener();

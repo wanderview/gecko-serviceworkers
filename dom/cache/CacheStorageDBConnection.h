@@ -22,35 +22,40 @@ class CacheStorageDBListener;
 class CacheStorageDBConnection MOZ_FINAL
 {
 public:
-  CacheStorageDBConnection(CacheStorageDBListener& aListener,
+  CacheStorageDBConnection(CacheStorageDBListener* aListener,
                            cache::Namespace aNamespace,
                            const nsACString& aOrigin,
                            const nsACString& aBaseDomain,
                            bool aAllowCreate);
 
+  void ClearListener();
+
   void Get(cache::RequestId aRequestId, const nsAString& aKey);
-  nsresult Has(cache::RequestId aRequestId, const nsAString& aKey);
+  void Has(cache::RequestId aRequestId, const nsAString& aKey);
   void Put(cache::RequestId aRequestId, const nsAString& aKey,
            const nsID& aCacheId);
-  nsresult Delete(cache::RequestId aRequestId, const nsAString& aKey);
-  nsresult Keys(cache::RequestId aRequestId);
+  void Delete(cache::RequestId aRequestId, const nsAString& aKey);
+  void Keys(cache::RequestId aRequestId);
 
 private:
   class OpenRunnable;
   class GetRunnable;
+  class HasRunnable;
   class PutRunnable;
+  class DeleteRunnable;
+  class KeysRunnable;
 
   ~CacheStorageDBConnection();
-  void OnOpenComplete(nsresult aRv,
-                      already_AddRefed<mozIStorageConnection> aConnection);
   void OnGetComplete(cache::RequestId aRequestId, nsresult aRv, nsID* aCacheId);
+  void OnHasComplete(cache::RequestId aRequestId, nsresult aRv, bool aSuccess);
   void OnPutComplete(cache::RequestId aRequestId, nsresult aRv, bool aSuccess);
-
-  void ReportError(nsresult aRv);
+  void OnDeleteComplete(cache::RequestId aRequestId, nsresult aRv, bool aSuccess);
+  void OnKeysComplete(cache::RequestId aRequestId, nsresult aRv,
+                      const nsTArray<nsString>& aKeys);
 
   static const int32_t kLatestSchemaVersion = 1;
 
-  CacheStorageDBListener& mListener;
+  CacheStorageDBListener* mListener;
   const cache::Namespace mNamespace;
   const nsCString mOrigin;
   const nsCString mBaseDomain;
@@ -59,7 +64,7 @@ private:
   bool mFailed;
 
 public:
-  NS_INLINE_DECL_REFCOUNTING(CacheStorageDBConnection)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CacheStorageDBConnection)
 };
 
 } // namespace dom

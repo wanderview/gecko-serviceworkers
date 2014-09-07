@@ -26,11 +26,13 @@ public:
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor)=0;
   virtual void RecvGetResponse(cache::RequestId aRequestId,
                                nsresult aRv, PCacheChild* aActor)=0;
-  virtual void RecvHasResponse(cache::RequestId aRequestId, bool aResult)=0;
-  virtual void RecvCreateResponse(cache::RequestId aRequestId,
-                                  nsresult aRv, PCacheChild* aActor)=0;
-  virtual void RecvDeleteResponse(cache::RequestId aRequestId, bool aResult)=0;
-  virtual void RecvKeysResponse(const cache::RequestId& aRequestId,
+  virtual void RecvHasResponse(cache::RequestId aRequestId, nsresult aRv,
+                               bool aSuccess)=0;
+  virtual void RecvCreateResponse(cache::RequestId aRequestId, nsresult aRv,
+                                  PCacheChild* aActor)=0;
+  virtual void RecvDeleteResponse(cache::RequestId aRequestId, nsresult aRv,
+                                  bool aSuccess)=0;
+  virtual void RecvKeysResponse(cache::RequestId aRequestId, nsresult aRv,
                                 const nsTArray<nsString>& aKeys)=0;
 };
 

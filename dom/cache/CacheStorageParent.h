@@ -40,14 +40,15 @@ public:
   virtual bool RecvKeys(const cache::RequestId& aRequestId) MOZ_OVERRIDE;
 
   // CacheStorageDBListener
-  virtual void OnError(nsresult aRv) MOZ_OVERRIDE;
   virtual void OnGet(cache::RequestId aRequestId, nsresult aRv,
                      nsID* aCacheId) MOZ_OVERRIDE;
-  virtual void OnHas(cache::RequestId aRequestId, bool aResult) MOZ_OVERRIDE;
+  virtual void OnHas(cache::RequestId aRequestId, nsresult aRv,
+                     bool aSuccess) MOZ_OVERRIDE;
   virtual void OnPut(cache::RequestId aRequestId, nsresult aRv,
                      bool aSuccess) MOZ_OVERRIDE;
-  virtual void OnDelete(cache::RequestId aRequestId, bool aResult) MOZ_OVERRIDE;
-  virtual void OnKeys(cache::RequestId aRequestId,
+  virtual void OnDelete(cache::RequestId aRequestId, nsresult aRv,
+                        bool aSuccess) MOZ_OVERRIDE;
+  virtual void OnKeys(cache::RequestId aRequestId, nsresult aRv,
                       const nsTArray<nsString>& aKeys) MOZ_OVERRIDE;
 
 private:

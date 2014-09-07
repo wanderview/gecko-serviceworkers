@@ -62,14 +62,15 @@ public:
 
   // CacheStorageChildListener methods
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
-  virtual void RecvGetResponse(cache::RequestId aRequestId,
-                               nsresult aRv, PCacheChild* aActor) MOZ_OVERRIDE;
-  virtual void RecvHasResponse(cache::RequestId aRequestId, bool aResult) MOZ_OVERRIDE;
-  virtual void RecvCreateResponse(cache::RequestId aRequestId,
-                                  nsresult aRv, PCacheChild* aActor) MOZ_OVERRIDE;
-  virtual void RecvDeleteResponse(cache::RequestId aRequestId,
-                                  bool aResult) MOZ_OVERRIDE;
-  virtual void RecvKeysResponse(const cache::RequestId& aRequestId,
+  virtual void RecvGetResponse(cache::RequestId aRequestId, nsresult aRv,
+                               PCacheChild* aActor) MOZ_OVERRIDE;
+  virtual void RecvHasResponse(cache::RequestId aRequestId, nsresult aRv,
+                               bool aSuccess) MOZ_OVERRIDE;
+  virtual void RecvCreateResponse(cache::RequestId aRequestId, nsresult aRv,
+                                  PCacheChild* aActor) MOZ_OVERRIDE;
+  virtual void RecvDeleteResponse(cache::RequestId aRequestId, nsresult aRv,
+                                  bool aSuccess) MOZ_OVERRIDE;
+  virtual void RecvKeysResponse(cache::RequestId aRequestId, nsresult aRv,
                                 const nsTArray<nsString>& aKeys) MOZ_OVERRIDE;
 
 private:

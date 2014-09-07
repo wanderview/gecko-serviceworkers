@@ -251,6 +251,7 @@ CacheStorage::RecvGetResponse(RequestId aRequestId, nsresult aRv,
 
   if (NS_FAILED(aRv)) {
     promise->MaybeReject(aRv);
+    return;
   }
 
   if (!aActor) {
@@ -264,13 +265,20 @@ CacheStorage::RecvGetResponse(RequestId aRequestId, nsresult aRv,
 }
 
 void
-CacheStorage::RecvHasResponse(RequestId aRequestId, bool aResult)
+CacheStorage::RecvHasResponse(RequestId aRequestId, nsresult aRv, bool aSuccess)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
-  promise->MaybeResolve(aResult);
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+
+  }
+
+  promise->MaybeResolve(aSuccess);
 }
 
 void
@@ -301,23 +309,36 @@ CacheStorage::RecvCreateResponse(RequestId aRequestId, nsresult aRv,
 }
 
 void
-CacheStorage::RecvDeleteResponse(RequestId aRequestId, bool aResult)
+CacheStorage::RecvDeleteResponse(RequestId aRequestId, nsresult aRv,
+                                 bool aSuccess)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
-  promise->MaybeResolve(aResult);
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+  }
+
+  promise->MaybeResolve(aSuccess);
 }
 
 void
-CacheStorage::RecvKeysResponse(const RequestId& aRequestId,
+CacheStorage::RecvKeysResponse(RequestId aRequestId, nsresult aRv,
                                const nsTArray<nsString>& aKeys)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+  }
+
   promise->MaybeResolve(aKeys);
 }
 

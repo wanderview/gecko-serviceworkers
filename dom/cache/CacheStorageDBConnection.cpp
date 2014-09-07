@@ -33,10 +33,13 @@ class CacheStorageDBConnection::OpenRunnable : public CacheQuotaRunnable
 public:
   OpenRunnable(Namespace aNamespace, const nsACString& aOrigin,
                const nsACString& aBaseDomain, bool aAllowCreate,
+               RequestId aRequestId, const nsAString& aKey,
                CacheStorageDBConnection* aCacheStorageDBConnection)
     : CacheQuotaRunnable(aOrigin, aBaseDomain, NS_LITERAL_CSTRING("CacheStorage"))
     , mNamespace(aNamespace)
     , mAllowCreate(aAllowCreate)
+    , mRequestId(aRequestId)
+    , mKey(aKey)
     , mCacheStorageDBConnection(aCacheStorageDBConnection)
     , mResult(NS_OK)
   {
@@ -44,6 +47,8 @@ public:
   }
 
 protected:
+  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)=0;
+
   virtual void RunOnQuotaIOThread(const nsACString& aOrigin,
                                   const nsACString& aBaseDomain,
                                   nsIFile* aQuotaDir) MOZ_OVERRIDE
@@ -172,13 +177,7 @@ protected:
     mResult = trans.Commit();
     if (NS_FAILED(mResult)) { return; }
 
-    mConnection = conn.forget();
-  }
-
-  virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
-  {
-    nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
-    mCacheStorageDBConnection->OnOpenComplete(rv, mConnection.forget());
+    AfterOpenOnQuotaIOThread(conn);
   }
 
 protected:
@@ -186,6 +185,8 @@ protected:
 
   const Namespace mNamespace;
   const bool mAllowCreate;
+  const RequestId mRequestId;
+  const nsString mKey;
   nsRefPtr<CacheStorageDBConnection> mCacheStorageDBConnection;
   nsCOMPtr<mozIStorageConnection> mConnection;
   nsresult mResult;
@@ -195,30 +196,21 @@ class CacheStorageDBConnection::GetRunnable MOZ_FINAL :
   public CacheStorageDBConnection::OpenRunnable
 {
 public:
-  GetRunnable(RequestId aRequestId, const nsAString& aKey,
-              Namespace aNamespace, const nsACString& aOrigin,
-              const nsACString& aBaseDomain,
+  GetRunnable(Namespace aNamespace, const nsACString& aOrigin,
+              const nsACString& aBaseDomain, RequestId aRequestId,
+              const nsAString& aKey,
               CacheStorageDBConnection* aCacheStorageDBConnection)
-    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aCacheStorageDBConnection)
-    , mRequestId(aRequestId)
-    , mKey(aKey)
-  {
-    MOZ_ASSERT(mCacheStorageDBConnection);
-  }
+    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aRequestId, aKey,
+                   aCacheStorageDBConnection)
+  { }
 
 protected:
-  virtual void RunOnQuotaIOThread(const nsACString& aOrigin,
-                                  const nsACString& aBaseDomain,
-                                  nsIFile* aQuotaDir) MOZ_OVERRIDE
+  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
   {
-    OpenRunnable::RunOnQuotaIOThread(aOrigin, aBaseDomain, aQuotaDir);
-    if (NS_FAILED(mResult)) {
-      return;
-    }
+    MOZ_ASSERT(aConnection);
 
     nsCOMPtr<mozIStorageStatement> statement;
-
-    mResult = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
       "SELECT cache_uuid FROM caches WHERE namespace=?1 AND key=?2"
     ), getter_AddRefs(statement));
     if (NS_FAILED(mResult)) { return; }
@@ -252,9 +244,6 @@ protected:
       mCacheId = nullptr;
       return;
     }
-
-    statement = nullptr;
-    mConnection = nullptr;
   }
 
   virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
@@ -265,43 +254,82 @@ protected:
 
 private:
   virtual ~GetRunnable() { }
-
-  const RequestId mRequestId;
-  const nsString mKey;
   UniquePtr<nsID> mCacheId;
+};
+
+class CacheStorageDBConnection::HasRunnable MOZ_FINAL :
+  public CacheStorageDBConnection::OpenRunnable
+{
+public:
+  HasRunnable(Namespace aNamespace, const nsACString& aOrigin,
+              const nsACString& aBaseDomain, RequestId aRequestId,
+              const nsAString& aKey,
+              CacheStorageDBConnection* aCacheStorageDBConnection)
+    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aRequestId, aKey,
+                   aCacheStorageDBConnection)
+    , mSuccess(false)
+  { }
+
+protected:
+  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
+  {
+    MOZ_ASSERT(aConnection);
+
+    nsCOMPtr<mozIStorageStatement> statement;
+    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
+      "SELECT count(*) FROM caches WHERE namespace=?1 AND key=?2"
+    ), getter_AddRefs(statement));
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = statement->BindInt32Parameter(0, mNamespace);
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = statement->BindStringParameter(1, mKey);
+    if (NS_FAILED(mResult)) { return; }
+
+    bool hasMoreData;
+    mResult = statement->ExecuteStep(&hasMoreData);
+    if (NS_FAILED(mResult)) { return; }
+
+    int32_t count;
+    mResult = statement->GetInt32(0, &count);
+    if (NS_FAILED(mResult)) { return; }
+
+    mSuccess = count > 0;
+  }
+
+  virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  {
+    nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
+    mCacheStorageDBConnection->OnHasComplete(mRequestId, rv, mSuccess);
+  }
+
+private:
+  virtual ~HasRunnable() { }
+  bool mSuccess;
 };
 
 class CacheStorageDBConnection::PutRunnable MOZ_FINAL :
   public CacheStorageDBConnection::OpenRunnable
 {
 public:
-  PutRunnable(RequestId aRequestId, const nsAString& aKey,
-              const nsID& aCacheId,
-              Namespace aNamespace, const nsACString& aOrigin,
-              const nsACString& aBaseDomain,
+  PutRunnable(Namespace aNamespace, const nsACString& aOrigin,
+              const nsACString& aBaseDomain, RequestId aRequestId,
+              const nsAString& aKey, const nsID& aCacheId,
               CacheStorageDBConnection* aCacheStorageDBConnection)
-    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aCacheStorageDBConnection)
-    , mRequestId(aRequestId)
-    , mKey(aKey)
+    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aRequestId, aKey,
+                   aCacheStorageDBConnection)
     , mCacheId(aCacheId)
     , mSuccess(false)
-  {
-    MOZ_ASSERT(mCacheStorageDBConnection);
-  }
+  { }
 
 protected:
-  virtual void RunOnQuotaIOThread(const nsACString& aOrigin,
-                                  const nsACString& aBaseDomain,
-                                  nsIFile* aQuotaDir) MOZ_OVERRIDE
+  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
   {
-    OpenRunnable::RunOnQuotaIOThread(aOrigin, aBaseDomain, aQuotaDir);
-    if (NS_FAILED(mResult)) {
-      return;
-    }
+    MOZ_ASSERT(aConnection);
 
     nsCOMPtr<mozIStorageStatement> statement;
-
-    mResult = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
       "INSERT INTO caches (namespace, key, cache_uuid)VALUES(?1, ?2, ?3)"
     ), getter_AddRefs(statement));
     if (NS_FAILED(mResult)) { return; }
@@ -323,9 +351,6 @@ protected:
 
     nsresult rv = statement->Execute();
     mSuccess = NS_SUCCEEDED(rv);
-
-    statement = nullptr;
-    mConnection = nullptr;
   }
 
   virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
@@ -336,15 +361,111 @@ protected:
 
 private:
   virtual ~PutRunnable() { }
-
-  const RequestId mRequestId;
-  const nsString mKey;
   const nsID mCacheId;
   bool mSuccess;
 };
 
+class CacheStorageDBConnection::DeleteRunnable MOZ_FINAL :
+  public CacheStorageDBConnection::OpenRunnable
+{
+public:
+  DeleteRunnable(Namespace aNamespace, const nsACString& aOrigin,
+                 const nsACString& aBaseDomain, RequestId aRequestId,
+                 const nsAString& aKey,
+                 CacheStorageDBConnection* aCacheStorageDBConnection)
+    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aRequestId, aKey,
+                   aCacheStorageDBConnection)
+    , mSuccess(false)
+  { }
+
+protected:
+  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
+  {
+    MOZ_ASSERT(aConnection);
+
+    nsCOMPtr<mozIStorageStatement> statement;
+    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
+      "DELETE FROM caches WHERE namespace=?1 AND key=?2"
+    ), getter_AddRefs(statement));
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = statement->BindInt32Parameter(0, mNamespace);
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = statement->BindStringParameter(1, mKey);
+    if (NS_FAILED(mResult)) { return; }
+
+    // TODO: do this async
+    // TODO: use a transaction
+
+    nsresult rv = statement->Execute();
+    mSuccess = NS_SUCCEEDED(rv);
+  }
+
+  virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  {
+    nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
+    mCacheStorageDBConnection->OnDeleteComplete(mRequestId, rv, mSuccess);
+  }
+
+private:
+  virtual ~DeleteRunnable() { }
+  bool mSuccess;
+};
+
+class CacheStorageDBConnection::KeysRunnable MOZ_FINAL :
+  public CacheStorageDBConnection::OpenRunnable
+{
+public:
+  KeysRunnable(Namespace aNamespace, const nsACString& aOrigin,
+               const nsACString& aBaseDomain, RequestId aRequestId,
+               CacheStorageDBConnection* aCacheStorageDBConnection)
+    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aRequestId,
+                   NS_LITERAL_STRING(""), aCacheStorageDBConnection)
+  { }
+
+protected:
+  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
+  {
+    MOZ_ASSERT(aConnection);
+
+    nsCOMPtr<mozIStorageStatement> statement;
+    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
+      "SELECT key FROM caches WHERE namespace=?1 ORDER BY rowid"
+    ), getter_AddRefs(statement));
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = statement->BindInt32Parameter(0, mNamespace);
+    if (NS_FAILED(mResult)) { return; }
+
+    bool hasMoreData;
+    while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
+      nsString* key = mKeys.AppendElement();
+      if (!key) {
+        mResult = NS_ERROR_OUT_OF_MEMORY;
+        return;
+      }
+      mResult = statement->GetString(0, *key);
+      if (NS_FAILED(mResult)) { return; }
+    }
+  }
+
+  virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  {
+    nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
+    if (NS_FAILED(rv)) {
+      mKeys.Clear();
+    }
+    mCacheStorageDBConnection->OnKeysComplete(mRequestId, rv, mKeys);
+  }
+
+private:
+  virtual ~KeysRunnable() { }
+  nsTArray<nsString> mKeys;
+};
+
 CacheStorageDBConnection::
-CacheStorageDBConnection(CacheStorageDBListener& aListener,
+CacheStorageDBConnection(CacheStorageDBListener* aListener,
                          Namespace aNamespace,
                          const nsACString& aOrigin,
                          const nsACString& aBaseDomain,
@@ -356,168 +477,132 @@ CacheStorageDBConnection(CacheStorageDBListener& aListener,
   , mOwningThread(NS_GetCurrentThread())
   , mFailed(false)
 {
+  MOZ_ASSERT(mListener);
   MOZ_ASSERT(mOwningThread);
+}
 
-  nsRefPtr<OpenRunnable> open = new OpenRunnable(aNamespace,
-                                                 aOrigin,
-                                                 aBaseDomain,
-                                                 aAllowCreate,
-                                                 this);
-  if (!open) {
-    ReportError(NS_ERROR_OUT_OF_MEMORY);
-    return;
-  }
-  open->Dispatch();
+void
+CacheStorageDBConnection::ClearListener()
+{
+  MOZ_ASSERT(mListener);
+  mListener = nullptr;
 }
 
 void
 CacheStorageDBConnection::Get(RequestId aRequestId, const nsAString& aKey)
 {
-  nsRefPtr<GetRunnable> get = new GetRunnable(aRequestId, aKey,
-                                              mNamespace, mOrigin,
-                                              mBaseDomain, this);
+  nsRefPtr<GetRunnable> get = new GetRunnable(mNamespace, mOrigin, mBaseDomain,
+                                              aRequestId, aKey, this);
   if (!get) {
-    ReportError(NS_ERROR_OUT_OF_MEMORY);
+    OnGetComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY, nullptr);
     return;
   }
   get->Dispatch();
 }
 
-nsresult
+void
 CacheStorageDBConnection::Has(RequestId aRequestId, const nsAString& aKey)
 {
-  nsCOMPtr<mozIStorageStatement> statement;
-
-  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
-    "SELECT count(*) FROM caches WHERE namespace=?1 AND key=?2"
-  ), getter_AddRefs(statement));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = statement->BindInt32Parameter(0, mNamespace);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = statement->BindStringParameter(1, aKey);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // TODO: do this async
-  // TODO: use a transaction
-
-  bool hasMoreData;
-  rv = statement->ExecuteStep(&hasMoreData);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  int32_t count;
-  rv = statement->GetInt32(0, &count);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  mListener.OnHas(aRequestId, count > 0);
-  return NS_OK;
+  nsRefPtr<HasRunnable> has = new HasRunnable(mNamespace, mOrigin, mBaseDomain,
+                                              aRequestId, aKey, this);
+  if (!has) {
+    OnHasComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY, false);
+    return;
+  }
+  has->Dispatch();
 }
 
 void
 CacheStorageDBConnection::Put(RequestId aRequestId, const nsAString& aKey,
                               const nsID& aCacheId)
 {
-  nsRefPtr<PutRunnable> put = new PutRunnable(aRequestId, aKey, aCacheId,
-                                              mNamespace, mOrigin,
-                                              mBaseDomain, this);
+  nsRefPtr<PutRunnable> put = new PutRunnable(mNamespace, mOrigin, mBaseDomain,
+                                              aRequestId, aKey, aCacheId, this);
   if (!put) {
-    ReportError(NS_ERROR_OUT_OF_MEMORY);
+    OnPutComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY, false);
     return;
   }
   put->Dispatch();
 }
 
-nsresult
+void
 CacheStorageDBConnection::Delete(RequestId aRequestId, const nsAString& aKey)
 {
-  nsCOMPtr<mozIStorageStatement> statement;
-
-  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
-    "DELETE FROM caches WHERE namespace=?1 AND key=?2"
-  ), getter_AddRefs(statement));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = statement->BindInt32Parameter(0, mNamespace);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = statement->BindStringParameter(1, aKey);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // TODO: do this async
-  // TODO: use a transaction
-
-  rv = statement->Execute();
-  bool result = NS_SUCCEEDED(rv);
-
-  mListener.OnDelete(aRequestId, result);
-  return NS_OK;
+  nsRefPtr<DeleteRunnable> del = new DeleteRunnable(mNamespace, mOrigin,
+                                                    mBaseDomain, aRequestId,
+                                                    aKey, this);
+  if (!del) {
+    OnDeleteComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY, false);
+    return;
+  }
+  del->Dispatch();
 }
 
-nsresult
+void
 CacheStorageDBConnection::Keys(RequestId aRequestId)
 {
-  nsCOMPtr<mozIStorageStatement> statement;
-
-  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
-    "SELECT key FROM caches WHERE namespace=?1 ORDER BY rowid"
-  ), getter_AddRefs(statement));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = statement->BindInt32Parameter(0, mNamespace);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // TODO: do this async
-  // TODO: use a transaction
-
-  nsTArray<nsString> keys;
-
-  bool hasMoreData;
-  while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
-    nsString* key = keys.AppendElement();
-    NS_ENSURE_TRUE(key, NS_ERROR_OUT_OF_MEMORY);
-    rv = statement->GetString(0, *key);
-    NS_ENSURE_SUCCESS(rv, rv);
+  nsRefPtr<KeysRunnable> keys = new KeysRunnable(mNamespace, mOrigin,
+                                                 mBaseDomain, aRequestId, this);
+  if (!keys) {
+    OnKeysComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY, nsTArray<nsString>());
+    return;
   }
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  mListener.OnKeys(aRequestId, keys);
-  return NS_OK;
+  keys->Dispatch();
 }
 
 CacheStorageDBConnection::~CacheStorageDBConnection()
 {
-}
-
-void
-CacheStorageDBConnection::OnOpenComplete(nsresult aRv,
-                          already_AddRefed<mozIStorageConnection> aConnection)
-{
-  if (NS_FAILED(aRv)) {
-    ReportError(aRv);
-  }
-  mConnection = aConnection;
+  MOZ_ASSERT(!mListener);
 }
 
 void
 CacheStorageDBConnection::OnGetComplete(RequestId aRequestId, nsresult aRv,
                                         nsID* aCacheId)
 {
-  mListener.OnGet(aRequestId, aRv, aCacheId);
+  // TODO: assert on owning thread
+  if (mListener) {
+    mListener->OnGet(aRequestId, aRv, aCacheId);
+  }
+}
+
+void
+CacheStorageDBConnection::OnHasComplete(cache::RequestId aRequestId,
+                                        nsresult aRv, bool aSuccess)
+{
+  // TODO: assert on owning thread
+  if (mListener) {
+    mListener->OnHas(aRequestId, aRv, aSuccess);
+  }
 }
 
 void
 CacheStorageDBConnection::OnPutComplete(RequestId aRequestId, nsresult aRv,
                                         bool aSuccess)
 {
-  mListener.OnPut(aRequestId, aRv, aSuccess);
+  // TODO: assert on owning thread
+  if (mListener) {
+    mListener->OnPut(aRequestId, aRv, aSuccess);
+  }
 }
 
 void
-CacheStorageDBConnection::ReportError(nsresult aRv)
+CacheStorageDBConnection::OnDeleteComplete(RequestId aRequestId, nsresult aRv,
+                                           bool aSuccess)
 {
-  mFailed = true;
-  mListener.OnError(aRv);
+  // TODO: assert on owning thread
+  if (mListener) {
+    mListener->OnDelete(aRequestId, aRv, aSuccess);
+  }
+}
+
+void
+CacheStorageDBConnection::OnKeysComplete(RequestId aRequestId, nsresult aRv,
+                                         const nsTArray<nsString>& aKeys)
+{
+  // TODO: assert on owning thread
+  if (mListener) {
+    mListener->OnKeys(aRequestId, aRv, aKeys);
+  }
 }
 
 } // namespace dom
