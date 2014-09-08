@@ -139,6 +139,7 @@ protected:
     MOZ_ASSERT(conn);
 
     mResult = CacheStorageDBSchema::Create(conn);
+    if (NS_FAILED(mResult)) { return; }
 
     AfterOpenOnQuotaIOThread(conn);
   }
@@ -181,6 +182,7 @@ protected:
     nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
     if (NS_FAILED(rv) || !mSuccess) {
       mCacheStorageDBConnection->OnGetComplete(mRequestId, rv, nullptr);
+      return;
     }
     mCacheStorageDBConnection->OnGetComplete(mRequestId, rv, &mCacheId);
   }

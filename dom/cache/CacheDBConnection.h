@@ -61,23 +61,6 @@ private:
                       const nsACString& aBaseDomain, const nsID& aCacheId,
                       bool allowCreate);
 
-  nsresult QueryAll(mozIStorageConnection* aConnection,
-                    nsTArray<EntryId>& aEntryIdListOut);
-  nsresult QueryCache(mozIStorageConnection* aConnection,
-                      const PCacheRequest& aRequest,
-                      const PCacheQueryParams& aParams,
-                      nsTArray<EntryId>& aEntryIdListOut);
-  bool MatchByVaryHeader(mozIStorageConnection* aConnection,
-                         const PCacheRequest& aRequest, int32_t entryId);
-  nsresult DeleteEntries(mozIStorageConnection* aConnection,
-                         const nsTArray<EntryId>& aEntryIdList,
-                         uint32_t aPos=0, int32_t aLen=-1);
-  nsresult InsertEntry(mozIStorageConnection* aConnection,
-                       const PCacheRequest& aRequest,
-                       const PCacheResponse& aResponse);
-  nsresult ReadResponse(mozIStorageConnection* aConnection,
-                        EntryId aEntryId, PCacheResponse& aResponseOut);
-
   void OnMatchComplete(cache::RequestId aRequestId, nsresult aRv,
                        const PCacheResponseOrVoid& aResponse);
   void OnMatchAllComplete(cache::RequestId aRequestId, nsresult aRv,
