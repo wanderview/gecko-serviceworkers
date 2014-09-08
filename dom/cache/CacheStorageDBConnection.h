@@ -12,7 +12,7 @@
 #include "nsISupportsImpl.h"
 
 class mozIStorageConnection;
-class nsID;
+struct nsID;
 
 namespace mozilla {
 namespace dom {
@@ -51,8 +51,6 @@ private:
   void OnDeleteComplete(cache::RequestId aRequestId, nsresult aRv, bool aSuccess);
   void OnKeysComplete(cache::RequestId aRequestId, nsresult aRv,
                       const nsTArray<nsString>& aKeys);
-
-  static const int32_t kLatestSchemaVersion = 1;
 
   CacheStorageDBListener* mListener;
   const cache::Namespace mNamespace;

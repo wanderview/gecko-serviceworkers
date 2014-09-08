@@ -17,6 +17,7 @@ EXPORTS.mozilla.dom += [
     'CacheStorageChildListener.h',
     'CacheStorageDBConnection.h',
     'CacheStorageDBListener.h',
+    'CacheStorageDBSchema.h',
     'CacheStorageParent.h',
     'CacheTypes.h',
 ]
@@ -30,6 +31,7 @@ UNIFIED_SOURCES += [
     'CacheStorage.cpp',
     'CacheStorageChild.cpp',
     'CacheStorageDBConnection.cpp',
+    'CacheStorageDBSchema.cpp',
     'CacheStorageParent.cpp',
 ]
 

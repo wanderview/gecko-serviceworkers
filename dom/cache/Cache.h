@@ -25,7 +25,7 @@ class OwningRequestOrScalarValueString;
 class Promise;
 class PCacheChild;
 class RequestOrScalarValueString;
-class QueryParams;
+struct QueryParams;
 class Response;
 template<typename T> class Optional;
 template<typename T> class Sequence;

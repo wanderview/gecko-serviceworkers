@@ -27,7 +27,7 @@ namespace dom {
 
 class CacheStorageChild;
 class Promise;
-class QueryParams;
+struct QueryParams;
 class RequestOrScalarValueString;
 
 class CacheStorage MOZ_FINAL : public nsIIPCBackgroundChildCreateCallback

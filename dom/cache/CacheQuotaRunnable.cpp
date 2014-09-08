@@ -6,6 +6,7 @@
 
 #include "mozilla/dom/CacheQuotaRunnable.h"
 
+#include "mozilla/DebugOnly.h"
 #include "mozilla/dom/quota/OriginOrPatternString.h"
 #include "mozilla/dom/quota/QuotaManager.h"
 #include "nsThreadUtils.h"
@@ -136,7 +137,8 @@ CacheQuotaRunnable::DispatchError(nsresult aRv)
 {
   mResult = aRv;
   mState = STATE_COMPLETE;
-  nsresult rv = mInitiatingThread->Dispatch(this, nsIThread::DISPATCH_NORMAL);
+  DebugOnly<nsresult> rv;
+  rv = mInitiatingThread->Dispatch(this, nsIThread::DISPATCH_NORMAL);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
 }
 

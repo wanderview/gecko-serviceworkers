@@ -8,6 +8,7 @@
 
 #include "mozilla/dom/CacheQuotaRunnable.h"
 #include "mozilla/dom/CacheStorageDBListener.h"
+#include "mozilla/dom/CacheStorageDBSchema.h"
 #include "mozilla/dom/quota/QuotaManager.h"
 #include "mozilla/UniquePtr.h"
 #include "mozIStorageConnection.h"
@@ -137,48 +138,7 @@ protected:
     if (NS_FAILED(mResult)) { return; }
     MOZ_ASSERT(conn);
 
-  #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
-    mResult = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-      // Switch the journaling mode to TRUNCATE to avoid changing the directory
-      // structure at the conclusion of every transaction for devices with slower
-      // file systems.
-      "PRAGMA journal_mode = TRUNCATE; "
-    ));
-    if (NS_FAILED(mResult)) { return; }
-  #endif
-
-    int32_t schemaVersion;
-    mResult = conn->GetSchemaVersion(&schemaVersion);
-    if (NS_FAILED(mResult)) { return; }
-
-    mozStorageTransaction trans(conn, false,
-                                mozIStorageConnection::TRANSACTION_IMMEDIATE);
-
-    if (!schemaVersion) {
-      mResult = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-        "CREATE TABLE caches ("
-          "namespace INTEGER NOT NULL, "
-          "key TEXT NOT NULL, "
-          "cache_uuid TEXT NOT NULL, "
-          "PRIMARY KEY(namespace, key)"
-        ");"
-      ));
-      if (NS_FAILED(mResult)) { return; }
-
-      mResult = conn->SetSchemaVersion(kLatestSchemaVersion);
-      if (NS_FAILED(mResult)) { return; }
-
-      mResult = conn->GetSchemaVersion(&schemaVersion);
-      if (NS_FAILED(mResult)) { return; }
-    }
-
-    if (schemaVersion != kLatestSchemaVersion) {
-      mResult = NS_ERROR_FAILURE;
-      return;
-    }
-
-    mResult = trans.Commit();
-    if (NS_FAILED(mResult)) { return; }
+    mResult = CacheStorageDBSchema::Create(conn);
 
     AfterOpenOnQuotaIOThread(conn);
   }
@@ -205,60 +165,30 @@ public:
               CacheStorageDBConnection* aCacheStorageDBConnection)
     : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aRequestId, aKey,
                    aCacheStorageDBConnection)
+    , mSuccess(false)
   { }
 
 protected:
   virtual void
   AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
-    MOZ_ASSERT(aConnection);
-
-    nsCOMPtr<mozIStorageStatement> statement;
-    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
-      "SELECT cache_uuid FROM caches WHERE namespace=?1 AND key=?2"
-    ), getter_AddRefs(statement));
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindInt32Parameter(0, mNamespace);
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindStringParameter(1, mKey);
-    if (NS_FAILED(mResult)) { return; }
-
-    bool hasMoreData;
-    mResult = statement->ExecuteStep(&hasMoreData);
-    if (NS_FAILED(mResult)) { return; }
-
-    if (!hasMoreData) {
-      return;
-    }
-
-    nsAutoCString uuidString;
-    mResult = statement->GetUTF8String(0, uuidString);
-    if (NS_FAILED(mResult)) { return; }
-
-    mCacheId.reset(new nsID());
-    if (!mCacheId) {
-      mResult = NS_ERROR_OUT_OF_MEMORY;
-      return;
-    }
-
-    if (!mCacheId->Parse(uuidString.get())) {
-      mResult = NS_ERROR_FAILURE;
-      mCacheId = nullptr;
-      return;
-    }
+    mResult = CacheStorageDBSchema::Get(aConnection, mNamespace, mKey,
+                                        &mSuccess, &mCacheId);
   }
 
   virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
   {
     nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
-    mCacheStorageDBConnection->OnGetComplete(mRequestId, rv, mCacheId.get());
+    if (NS_FAILED(rv) || !mSuccess) {
+      mCacheStorageDBConnection->OnGetComplete(mRequestId, rv, nullptr);
+    }
+    mCacheStorageDBConnection->OnGetComplete(mRequestId, rv, &mCacheId);
   }
 
 private:
   virtual ~GetRunnable() { }
-  UniquePtr<nsID> mCacheId;
+  nsID mCacheId;
+  bool mSuccess;
 };
 
 class CacheStorageDBConnection::HasRunnable MOZ_FINAL :
@@ -278,29 +208,8 @@ protected:
   virtual void
   AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
-    MOZ_ASSERT(aConnection);
-
-    nsCOMPtr<mozIStorageStatement> statement;
-    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
-      "SELECT count(*) FROM caches WHERE namespace=?1 AND key=?2"
-    ), getter_AddRefs(statement));
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindInt32Parameter(0, mNamespace);
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindStringParameter(1, mKey);
-    if (NS_FAILED(mResult)) { return; }
-
-    bool hasMoreData;
-    mResult = statement->ExecuteStep(&hasMoreData);
-    if (NS_FAILED(mResult)) { return; }
-
-    int32_t count;
-    mResult = statement->GetInt32(0, &count);
-    if (NS_FAILED(mResult)) { return; }
-
-    mSuccess = count > 0;
+    mResult = CacheStorageDBSchema::Has(aConnection, mNamespace, mKey,
+                                        &mSuccess);
   }
 
   virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
@@ -332,31 +241,8 @@ protected:
   virtual void
   AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
-    MOZ_ASSERT(aConnection);
-
-    nsCOMPtr<mozIStorageStatement> statement;
-    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
-      "INSERT INTO caches (namespace, key, cache_uuid)VALUES(?1, ?2, ?3)"
-    ), getter_AddRefs(statement));
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindInt32Parameter(0, mNamespace);
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindStringParameter(1, mKey);
-    if (NS_FAILED(mResult)) { return; }
-
-    char uuidBuf[NSID_LENGTH];
-    mCacheId.ToProvidedString(uuidBuf);
-
-    mResult = statement->BindUTF8StringParameter(2, nsAutoCString(uuidBuf));
-    if (NS_FAILED(mResult)) { return; }
-
-    // TODO: do this async
-    // TODO: use a transaction
-
-    nsresult rv = statement->Execute();
-    mSuccess = NS_SUCCEEDED(rv);
+    mResult = CacheStorageDBSchema::Put(aConnection, mNamespace, mKey, mCacheId,
+                                        &mSuccess);
   }
 
   virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
@@ -388,25 +274,8 @@ protected:
   virtual void
   AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
-    MOZ_ASSERT(aConnection);
-
-    nsCOMPtr<mozIStorageStatement> statement;
-    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
-      "DELETE FROM caches WHERE namespace=?1 AND key=?2"
-    ), getter_AddRefs(statement));
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindInt32Parameter(0, mNamespace);
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindStringParameter(1, mKey);
-    if (NS_FAILED(mResult)) { return; }
-
-    // TODO: do this async
-    // TODO: use a transaction
-
-    nsresult rv = statement->Execute();
-    mSuccess = NS_SUCCEEDED(rv);
+    mResult = CacheStorageDBSchema::Delete(aConnection, mNamespace, mKey,
+                                           &mSuccess);
   }
 
   virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
@@ -435,27 +304,7 @@ protected:
   virtual void
   AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
-    MOZ_ASSERT(aConnection);
-
-    nsCOMPtr<mozIStorageStatement> statement;
-    mResult = aConnection->CreateStatement(NS_LITERAL_CSTRING(
-      "SELECT key FROM caches WHERE namespace=?1 ORDER BY rowid"
-    ), getter_AddRefs(statement));
-    if (NS_FAILED(mResult)) { return; }
-
-    mResult = statement->BindInt32Parameter(0, mNamespace);
-    if (NS_FAILED(mResult)) { return; }
-
-    bool hasMoreData;
-    while(NS_SUCCEEDED(statement->ExecuteStep(&hasMoreData)) && hasMoreData) {
-      nsString* key = mKeys.AppendElement();
-      if (!key) {
-        mResult = NS_ERROR_OUT_OF_MEMORY;
-        return;
-      }
-      mResult = statement->GetString(0, *key);
-      if (NS_FAILED(mResult)) { return; }
-    }
+    mResult = CacheStorageDBSchema::Keys(aConnection, mNamespace, mKeys);
   }
 
   virtual void CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
