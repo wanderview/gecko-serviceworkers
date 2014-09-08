@@ -25,31 +25,35 @@ public:
   typedef int32_t EntryId;
 
   static already_AddRefed<CacheDBConnection>
-  Get(CacheDBListener& aListener, const nsACString& aOrigin,
-      const nsACString& aBaseDomain, const nsID& aCacheId);
-
-  static already_AddRefed<CacheDBConnection>
-  Create(CacheDBListener& aListener, const nsACString& aOrigin,
+  Create(CacheDBListener* aListener, const nsACString& aOrigin,
          const nsACString& aBaseDomain);
 
-  nsresult Match(cache::RequestId aRequestId,
-                 const PCacheRequest& aRequest,
-                 const PCacheQueryParams& aParams);
+  CacheDBConnection(CacheDBListener* aListener, const nsACString& aOrigin,
+                    const nsACString& aBaseDomain, const nsID& aCacheId);
 
-  nsresult MatchAll(cache::RequestId aRequestId,
-                    const PCacheRequestOrVoid& aRequest,
-                    const PCacheQueryParams& aParams);
+  void ClearListener();
 
-  nsresult Put(cache::RequestId aRequestId, const PCacheRequest& aRequest,
-               const PCacheResponse& aResponse);
+  void Match(cache::RequestId aRequestId,
+             const PCacheRequest& aRequest,
+             const PCacheQueryParams& aParams);
 
-  nsresult Delete(cache::RequestId aRequestId, const PCacheRequest& aRequest,
-                  const PCacheQueryParams& aParams);
+  void MatchAll(cache::RequestId aRequestId,
+                const PCacheRequestOrVoid& aRequest,
+                const PCacheQueryParams& aParams);
+
+  void Put(cache::RequestId aRequestId, const PCacheRequest& aRequest,
+           const PCacheResponse& aResponse);
+
+  void Delete(cache::RequestId aRequestId, const PCacheRequest& aRequest,
+              const PCacheQueryParams& aParams);
 
 private:
-  CacheDBConnection(CacheDBListener& aListener,
-                    const nsID& aCacheId,
-                    already_AddRefed<mozIStorageConnection> aConnection);
+  class OpenRunnable;
+  class MatchRunnable;
+  class MatchAllRunnable;
+  class PutRunnable;
+  class DeleteRunnable;
+
   ~CacheDBConnection();
 
   static already_AddRefed<CacheDBConnection>
@@ -57,24 +61,41 @@ private:
                       const nsACString& aBaseDomain, const nsID& aCacheId,
                       bool allowCreate);
 
-  nsresult QueryAll(nsTArray<EntryId>& aEntryIdListOut);
-  nsresult QueryCache(const PCacheRequest& aRequest,
+  nsresult QueryAll(mozIStorageConnection* aConnection,
+                    nsTArray<EntryId>& aEntryIdListOut);
+  nsresult QueryCache(mozIStorageConnection* aConnection,
+                      const PCacheRequest& aRequest,
                       const PCacheQueryParams& aParams,
                       nsTArray<EntryId>& aEntryIdListOut);
-  bool MatchByVaryHeader(const PCacheRequest& aRequest, int32_t entryId);
-  nsresult DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
+  bool MatchByVaryHeader(mozIStorageConnection* aConnection,
+                         const PCacheRequest& aRequest, int32_t entryId);
+  nsresult DeleteEntries(mozIStorageConnection* aConnection,
+                         const nsTArray<EntryId>& aEntryIdList,
                          uint32_t aPos=0, int32_t aLen=-1);
-  nsresult InsertEntry(const PCacheRequest& aRequest,
+  nsresult InsertEntry(mozIStorageConnection* aConnection,
+                       const PCacheRequest& aRequest,
                        const PCacheResponse& aResponse);
-  nsresult ReadResponse(EntryId aEntryId, PCacheResponse& aResponseOut);
+  nsresult ReadResponse(mozIStorageConnection* aConnection,
+                        EntryId aEntryId, PCacheResponse& aResponseOut);
+
+  void OnMatchComplete(cache::RequestId aRequestId, nsresult aRv,
+                       const PCacheResponseOrVoid& aResponse);
+  void OnMatchAllComplete(cache::RequestId aRequestId, nsresult aRv,
+                          const nsTArray<PCacheResponse>& aResponses);
+  void OnPutComplete(cache::RequestId aRequestId, nsresult aRv,
+                     const PCacheResponseOrVoid& aResponse);
+  void OnDeleteComplete(cache::RequestId aRequestId, nsresult aRv,
+                        bool aSuccess);
 
   static const int32_t kLatestSchemaVersion = 1;
-  CacheDBListener& mListener;
+  CacheDBListener* mListener;
+  const nsCString mOrigin;
+  const nsCString mBaseDomain;
   const nsID mCacheId;
-  nsCOMPtr<mozIStorageConnection> mConnection;
+  nsCString mQuotaId;
 
 public:
-  NS_INLINE_DECL_REFCOUNTING(CacheDBConnection)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CacheDBConnection)
 };
 
 } // namespace dom

@@ -46,65 +46,65 @@ CacheChild::ClearListener()
 }
 
 bool
-CacheChild::RecvMatchResponse(const RequestId& requestId,
+CacheChild::RecvMatchResponse(const RequestId& requestId, const nsresult& aRv,
                               const PCacheResponseOrVoid& response)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvMatchResponse(requestId, response);
+  mListener->RecvMatchResponse(requestId, aRv, response);
   return true;
 }
 
 bool
-CacheChild::RecvMatchAllResponse(const RequestId& requestId,
+CacheChild::RecvMatchAllResponse(const RequestId& requestId, const nsresult& aRv,
                                  const nsTArray<PCacheResponse>& responses)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvMatchAllResponse(requestId, responses);
+  mListener->RecvMatchAllResponse(requestId, aRv, responses);
   return true;
 }
 
 bool
-CacheChild::RecvAddResponse(const RequestId& requestId,
+CacheChild::RecvAddResponse(const RequestId& requestId, const nsresult& aRv,
                             const PCacheResponse& response)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvAddResponse(requestId, response);
+  mListener->RecvAddResponse(requestId, aRv, response);
   return true;
 }
 
 bool
-CacheChild::RecvAddAllResponse(const RequestId& requestId,
+CacheChild::RecvAddAllResponse(const RequestId& requestId, const nsresult& aRv,
                                const nsTArray<PCacheResponse>& responses)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvAddAllResponse(requestId, responses);
+  mListener->RecvAddAllResponse(requestId, aRv, responses);
   return true;
 }
 
 bool
-CacheChild::RecvPutResponse(const RequestId& requestId,
+CacheChild::RecvPutResponse(const RequestId& requestId, const nsresult& aRv,
                             const PCacheResponseOrVoid& response)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvPutResponse(requestId, response);
+  mListener->RecvPutResponse(requestId, aRv, response);
   return true;
 }
 
 bool
-CacheChild::RecvDeleteResponse(const RequestId& requestId,
+CacheChild::RecvDeleteResponse(const RequestId& requestId, const nsresult& aRv,
                                const bool& result)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvDeleteResponse(requestId, result);
+  mListener->RecvDeleteResponse(requestId, aRv, result);
   return true;
 }
 
 bool
-CacheChild::RecvKeysResponse(const RequestId& requestId,
+CacheChild::RecvKeysResponse(const RequestId& requestId, const nsresult& aRv,
                              const nsTArray<PCacheRequest>& requests)
 {
   MOZ_ASSERT(mListener);
-  mListener->RecvKeysResponse(requestId, requests);
+  mListener->RecvKeysResponse(requestId, aRv, requests);
   return true;
 }
 

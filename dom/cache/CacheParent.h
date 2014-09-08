@@ -53,18 +53,14 @@ public:
            const PCacheQueryParams& aParams) MOZ_OVERRIDE;
 
   // CacheDBListener methods
-  virtual void OnError(cache::RequestId aRequestId, nsresult aRv) MOZ_OVERRIDE;
-  virtual void
-  OnMatch(cache::RequestId aRequestId,
-          PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
-  virtual void
-  OnMatchAll(cache::RequestId aRequestId,
-             const nsTArray<PCacheResponse>& aResponses) MOZ_OVERRIDE;
-  virtual void
-  OnPut(cache::RequestId aRequestId,
-        const PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
-  virtual void
-  OnDelete(cache::RequestId aRequestId, bool aResult) MOZ_OVERRIDE;
+  virtual void OnMatch(cache::RequestId aRequestId, nsresult aRv,
+                       const PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
+  virtual void OnMatchAll(cache::RequestId aRequestId, nsresult aRv,
+                          const nsTArray<PCacheResponse>& aResponses) MOZ_OVERRIDE;
+  virtual void OnPut(cache::RequestId aRequestId, nsresult aRv,
+                     const PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
+  virtual void OnDelete(cache::RequestId aRequestId, nsresult aRv,
+                        bool aSuccess) MOZ_OVERRIDE;
 
 private:
   const nsCString mOrigin;

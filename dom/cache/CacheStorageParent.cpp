@@ -22,7 +22,10 @@ CacheStorageParent::CacheStorageParent(cache::Namespace aNamespace,
   : mNamespace(aNamespace)
   , mOrigin(aOrigin)
   , mBaseDomain(aBaseDomain)
+  , mDBConnection(new CacheStorageDBConnection(this, mNamespace, mOrigin,
+                                               mBaseDomain))
 {
+  MOZ_ASSERT(mDBConnection);
 }
 
 CacheStorageParent::~CacheStorageParent()
@@ -33,37 +36,24 @@ CacheStorageParent::~CacheStorageParent()
 void
 CacheStorageParent::ActorDestroy(ActorDestroyReason aReason)
 {
-  if (mDBConnection) {
-    mDBConnection->ClearListener();
-    mDBConnection = nullptr;
-  }
+  MOZ_ASSERT(mDBConnection);
+  mDBConnection->ClearListener();
+  mDBConnection = nullptr;
 }
 
 bool
 CacheStorageParent::RecvGet(const RequestId& aRequestId, const nsString& aKey)
 {
-  CacheStorageDBConnection *conn = GetDBConnection();
-  if (!conn) {
-    unused << SendGetResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY, nullptr);
-    return true;
-  }
-
-  conn->Get(aRequestId, aKey);
-
+  MOZ_ASSERT(mDBConnection);
+  mDBConnection->Get(aRequestId, aKey);
   return true;
 }
 
 bool
 CacheStorageParent::RecvHas(const RequestId& aRequestId, const nsString& aKey)
 {
-  CacheStorageDBConnection *conn = GetDBConnection();
-  if (!conn) {
-    unused << SendHasResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY, false);
-    return true;
-  }
-
-  conn->Has(aRequestId, aKey);
-
+  MOZ_ASSERT(mDBConnection);
+  mDBConnection->Has(aRequestId, aKey);
   return true;
 }
 
@@ -71,18 +61,14 @@ bool
 CacheStorageParent::RecvCreate(const RequestId& aRequestId,
                                const nsString& aKey)
 {
-  CacheStorageDBConnection *conn = GetOrCreateDBConnection();
-  if (NS_WARN_IF(!conn)) {
-    unused << SendCreateResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY, nullptr);
-    return true;
-  }
+  MOZ_ASSERT(mDBConnection);
 
   // TODO: perform a Has() check first
   // TODO: create real DB-backed cache object
   // TODO: get uuid from cache object
   nsID uuid;
 
-  conn->Put(aRequestId, aKey, uuid);
+  mDBConnection->Put(aRequestId, aKey, uuid);
 
   return true;
 }
@@ -91,29 +77,16 @@ bool
 CacheStorageParent::RecvDelete(const RequestId& aRequestId,
                                const nsString& aKey)
 {
-  CacheStorageDBConnection *conn = GetDBConnection();
-  if (!conn) {
-    unused << SendDeleteResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY, false);
-    return true;
-  }
-
-  conn->Delete(aRequestId, aKey);
-
+  MOZ_ASSERT(mDBConnection);
+  mDBConnection->Delete(aRequestId, aKey);
   return true;
 }
 
 bool
 CacheStorageParent::RecvKeys(const RequestId& aRequestId)
 {
-  CacheStorageDBConnection *conn = GetDBConnection();
-  if (!conn) {
-    unused << SendKeysResponse(aRequestId, NS_ERROR_OUT_OF_MEMORY,
-                               nsTArray<nsString>());
-    return true;
-  }
-
-  conn->Keys(aRequestId);
-
+  MOZ_ASSERT(mDBConnection);
+  mDBConnection->Keys(aRequestId);
   return true;
 }
 
@@ -174,29 +147,6 @@ CacheStorageParent::OnKeys(RequestId aRequestId, nsresult aRv,
                            const nsTArray<nsString>& aKeys)
 {
   unused << SendKeysResponse(aRequestId, aRv, aKeys);
-}
-
-
-CacheStorageDBConnection*
-CacheStorageParent::GetDBConnection()
-{
-  if (!mDBConnection) {
-    mDBConnection = new CacheStorageDBConnection(this, mNamespace, mOrigin,
-                                                 mBaseDomain, false);
-  }
-
-  return mDBConnection;
-}
-
-CacheStorageDBConnection*
-CacheStorageParent::GetOrCreateDBConnection()
-{
-  if (!mDBConnection) {
-    mDBConnection = new CacheStorageDBConnection(this, mNamespace, mOrigin,
-                                                 mBaseDomain, true);
-  }
-
-  return mDBConnection;
 }
 
 } // namespace dom

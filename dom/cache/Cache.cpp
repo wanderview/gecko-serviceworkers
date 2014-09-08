@@ -432,11 +432,16 @@ Cache::ActorDestroy(mozilla::ipc::IProtocol& aActor)
 }
 
 void
-Cache::RecvMatchResponse(RequestId aRequestId,
+Cache::RecvMatchResponse(RequestId aRequestId, nsresult aRv,
                          const PCacheResponseOrVoid& aResponse)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
+    return;
+  }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
     return;
   }
 
@@ -455,13 +460,19 @@ Cache::RecvMatchResponse(RequestId aRequestId,
 }
 
 void
-Cache::RecvMatchAllResponse(RequestId aRequestId,
+Cache::RecvMatchAllResponse(RequestId aRequestId, nsresult aRv,
                             const nsTArray<PCacheResponse>& aResponses)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+  }
+
   nsTArray<nsRefPtr<Response>> responses;
   for (uint32_t i = 0; i < aResponses.Length(); ++i) {
     nsRefPtr<Response> response = new Response(mOwner);
@@ -476,12 +487,19 @@ Cache::RecvMatchAllResponse(RequestId aRequestId,
 }
 
 void
-Cache::RecvAddResponse(RequestId aRequestId, const PCacheResponse& aResponse)
+Cache::RecvAddResponse(RequestId aRequestId, nsresult aRv,
+                       const PCacheResponse& aResponse)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+  }
+
   nsRefPtr<Response> response = new Response(mOwner);
   if (!response) {
     promise->MaybeReject(NS_ERROR_OUT_OF_MEMORY);
@@ -492,13 +510,19 @@ Cache::RecvAddResponse(RequestId aRequestId, const PCacheResponse& aResponse)
 }
 
 void
-Cache::RecvAddAllResponse(RequestId aRequestId,
+Cache::RecvAddAllResponse(RequestId aRequestId, nsresult aRv,
                           const nsTArray<PCacheResponse>& aResponses)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+  }
+
   nsTArray<nsRefPtr<Response>> responses;
   for (uint32_t i = 0; i < aResponses.Length(); ++i) {
     nsRefPtr<Response> response = new Response(mOwner);
@@ -513,13 +537,19 @@ Cache::RecvAddAllResponse(RequestId aRequestId,
 }
 
 void
-Cache::RecvPutResponse(RequestId aRequestId,
+Cache::RecvPutResponse(RequestId aRequestId, nsresult aRv,
                        const PCacheResponseOrVoid& aResponse)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+  }
+
   if (aResponse.type() == PCacheResponseOrVoid::Tvoid_t) {
     promise->MaybeResolve(nullptr);
     return;
@@ -534,23 +564,35 @@ Cache::RecvPutResponse(RequestId aRequestId,
 }
 
 void
-Cache::RecvDeleteResponse(RequestId aRequestId, bool aResult)
+Cache::RecvDeleteResponse(RequestId aRequestId, nsresult aRv, bool aSuccess)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
-  promise->MaybeResolve(aResult);
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+  }
+
+  promise->MaybeResolve(aSuccess);
 }
 
 void
-Cache::RecvKeysResponse(RequestId aRequestId,
+Cache::RecvKeysResponse(RequestId aRequestId, nsresult aRv,
                         const nsTArray<PCacheRequest>& aRequests)
 {
   nsRefPtr<Promise> promise = RemoveRequestPromise(aRequestId);
   if (NS_WARN_IF(!promise)) {
     return;
   }
+
+  if (NS_FAILED(aRv)) {
+    promise->MaybeReject(aRv);
+    return;
+  }
+
   nsTArray<nsRefPtr<Request>> requests;
   for (uint32_t i = 0; i < aRequests.Length(); ++i) {
     MOZ_CRASH("not implemented - can't construct new Request()");

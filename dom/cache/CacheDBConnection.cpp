@@ -7,6 +7,7 @@
 #include "mozilla/dom/CacheDBConnection.h"
 
 #include "mozilla/dom/CacheDBListener.h"
+#include "mozilla/dom/CacheQuotaRunnable.h"
 #include "mozilla/dom/CacheTypes.h"
 #include "mozilla/dom/Headers.h"
 #include "mozilla/dom/quota/QuotaManager.h"
@@ -58,17 +59,429 @@ BindListParamsToQuery(mozIStorageStatement* aStatement,
   return NS_OK;
 }
 
-//static
-already_AddRefed<CacheDBConnection>
-CacheDBConnection::Get(CacheDBListener& aListener, const nsACString& aOrigin,
-    const nsACString& aBaseDomain, const nsID& aCacheId)
+class CacheDBConnection::OpenRunnable : public CacheQuotaRunnable
 {
-  return GetOrCreateInternal(aListener, aOrigin, aBaseDomain, aCacheId, false);
-}
+public:
+  OpenRunnable(const nsACString& aOrigin, const nsACString& aBaseDomain,
+               const nsACString& aQuotaId, bool aAllowCreate,
+               const nsID& aCacheId, RequestId aRequestId,
+               CacheDBConnection* aCacheDBConnection)
+    : CacheQuotaRunnable(aOrigin, aBaseDomain, aQuotaId)
+    , mAllowCreate(aAllowCreate)
+    , mCacheId(aCacheId)
+    , mRequestId(aRequestId)
+    , mCacheDBConnection(aCacheDBConnection)
+    , mResult(NS_OK)
+  {
+    MOZ_ASSERT(mCacheDBConnection);
+  }
+
+protected:
+  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)=0;
+
+  virtual ~OpenRunnable() { }
+  virtual void RunOnQuotaIOThread(const nsACString& aOrigin,
+                                  const nsACString& aBaseDomain,
+                                  nsIFile* aQuotaDir) MOZ_OVERRIDE
+  {
+    MOZ_ASSERT(aQuotaDir);
+
+    mResult = aQuotaDir->Append(NS_LITERAL_STRING("cache"));
+    if (NS_FAILED(mResult)) { return; }
+
+    char cacheIdBuf[NSID_LENGTH];
+    mCacheId.ToProvidedString(cacheIdBuf);
+    mResult = aQuotaDir->Append(NS_ConvertUTF8toUTF16(cacheIdBuf));
+    if (NS_FAILED(mResult)) { return; }
+
+    bool exists;
+    mResult = aQuotaDir->Exists(&exists);
+    if (NS_FAILED(mResult) || (!exists && !mAllowCreate)) { return; }
+
+    if (!exists) {
+      mResult = aQuotaDir->Create(nsIFile::DIRECTORY_TYPE, 0755);
+      if (NS_FAILED(mResult)) { return; }
+    }
+
+    nsCOMPtr<nsIFile> dbFile;
+    mResult = aQuotaDir->Clone(getter_AddRefs(dbFile));
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = dbFile->Append(NS_LITERAL_STRING("db.sqlite"));
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = dbFile->Exists(&exists);
+    if (NS_FAILED(mResult) || (!exists && !mAllowCreate)) { return; }
+
+    // XXX: Jonas tells me nsIFileURL usage off-main-thread is dangerous,
+    //      but this is what IDB does to access mozIStorageConnection so
+    //      it seems at least this corner case mostly works.
+
+    nsCOMPtr<nsIFile> dbTmpDir;
+    mResult = aQuotaDir->Clone(getter_AddRefs(dbTmpDir));
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = dbTmpDir->Append(NS_LITERAL_STRING("db"));
+    if (NS_FAILED(mResult)) { return; }
+
+    nsCOMPtr<nsIURI> uri;
+    mResult = NS_NewFileURI(getter_AddRefs(uri), dbFile);
+    if (NS_FAILED(mResult)) { return; }
+
+    nsCOMPtr<nsIFileURL> dbFileUrl = do_QueryInterface(uri);
+    if (NS_WARN_IF(!dbFileUrl)) {
+      mResult = NS_ERROR_FAILURE;
+      return;
+    }
+
+    nsAutoCString type;
+    PersistenceTypeToText(PERSISTENCE_TYPE_PERSISTENT, type);
+
+    mResult = dbFileUrl->SetQuery(NS_LITERAL_CSTRING("persistenceType=") + type +
+                             NS_LITERAL_CSTRING("&group=") + aBaseDomain +
+                             NS_LITERAL_CSTRING("&origin=") + aOrigin);
+    if (NS_FAILED(mResult)) { return; }
+
+    nsCOMPtr<mozIStorageService> ss =
+      do_GetService(MOZ_STORAGE_SERVICE_CONTRACTID);
+    if (NS_WARN_IF(!ss)) {
+      mResult = NS_ERROR_FAILURE;
+      return;
+    }
+
+    nsCOMPtr<mozIStorageConnection> conn;
+    mResult = ss->OpenDatabaseWithFileURL(dbFileUrl, getter_AddRefs(conn));
+    if (mResult == NS_ERROR_FILE_CORRUPTED) {
+      dbFile->Remove(false);
+      if (NS_FAILED(mResult)) { return; }
+
+      mResult = dbTmpDir->Exists(&exists);
+      if (NS_FAILED(mResult)) { return; }
+
+      if (exists) {
+        bool isDir;
+        mResult = dbTmpDir->IsDirectory(&isDir);
+        if (NS_FAILED(mResult) || !isDir) { return; }
+        mResult = dbTmpDir->Remove(true);
+        if (NS_FAILED(mResult)) { return; }
+      }
+
+      mResult = ss->OpenDatabaseWithFileURL(dbFileUrl, getter_AddRefs(conn));
+    }
+    if (NS_FAILED(mResult)) { return; }
+    MOZ_ASSERT(conn);
+
+    mResult = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+  #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+      // Switch the journaling mode to TRUNCATE to avoid changing the directory
+      // structure at the conclusion of every transaction for devices with slower
+      // file systems.
+      "PRAGMA journal_mode = TRUNCATE; "
+  #endif
+      "PRAGMA foreign_keys = ON; "
+    ));
+    if (NS_FAILED(mResult)) { return; }
+
+    int32_t schemaVersion;
+    mResult = conn->GetSchemaVersion(&schemaVersion);
+    if (NS_FAILED(mResult)) { return; }
+
+    mozStorageTransaction trans(conn, false,
+                                mozIStorageConnection::TRANSACTION_IMMEDIATE);
+
+    if (!schemaVersion) {
+      mResult = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+        "CREATE TABLE map ("
+          "id INTEGER NOT NULL PRIMARY KEY, "
+          "request_method TEXT NOT NULL, "
+          "request_url TEXT NOT NULL, "
+          "request_url_no_query TEXT NOT NULL, "
+          "request_mode INTEGER NOT NULL, "
+          "request_credentials INTEGER NOT NULL, "
+          //"request_body_file TEXT NOT NULL, "
+          "response_type INTEGER NOT NULL, "
+          "response_status INTEGER NOT NULL, "
+          "response_status_text TEXT NOT NULL "
+          //"response_body_file TEXT NOT NULL "
+        ");"
+      ));
+      if (NS_FAILED(mResult)) { return; }
+
+      mResult = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+        "CREATE TABLE request_headers ("
+          "name TEXT NOT NULL, "
+          "value TEXT NOT NULL, "
+          "map_id INTEGER NOT NULL REFERENCES map(id) "
+        ");"
+      ));
+      if (NS_FAILED(mResult)) { return; }
+
+      mResult = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+        "CREATE TABLE response_headers ("
+          "name TEXT NOT NULL, "
+          "value TEXT NOT NULL, "
+          "map_id INTEGER NOT NULL REFERENCES map(id) "
+        ");"
+      ));
+      if (NS_FAILED(mResult)) { return; }
+
+      conn->SetSchemaVersion(kLatestSchemaVersion);
+      if (NS_FAILED(mResult)) { return; }
+
+      mResult = conn->GetSchemaVersion(&schemaVersion);
+      if (NS_FAILED(mResult)) { return; }
+    }
+
+    if (schemaVersion != kLatestSchemaVersion) {
+      mResult = NS_ERROR_FAILURE;
+      return;
+    }
+
+    mResult = trans.Commit();
+    if (NS_FAILED(mResult)) { return; }
+
+    AfterOpenOnQuotaIOThread(conn);
+  }
+
+  const bool mAllowCreate;
+  const nsID mCacheId;
+  const RequestId mRequestId;
+  nsRefPtr<CacheDBConnection> mCacheDBConnection;
+  nsresult mResult;
+};
+
+class CacheDBConnection::MatchRunnable MOZ_FINAL :
+  public CacheDBConnection::OpenRunnable
+{
+public:
+  MatchRunnable(const nsACString& aOrigin, const nsACString& aBaseDomain,
+               const nsACString& aQuotaId, const nsID& aCacheId,
+               RequestId aRequestId, const PCacheRequest& aRequest,
+               const PCacheQueryParams& aParams,
+               CacheDBConnection* aCacheDBConnection)
+    : OpenRunnable(aOrigin, aBaseDomain, aQuotaId, false, aCacheId,
+                   aRequestId, aCacheDBConnection)
+    , mRequest(aRequest)
+    , mParams(aParams)
+    , mResponseOrVoid(void_t())
+  { }
+
+protected:
+  virtual ~MatchRunnable() { }
+
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
+  {
+    MOZ_ASSERT(aConnection);
+
+    nsTArray<EntryId> matches;
+    mResult = mCacheDBConnection->QueryCache(aConnection, mRequest, mParams,
+                                             matches);
+    if (NS_FAILED(mResult)) { return; }
+
+    if (matches.Length() < 1) {
+      mResponseOrVoid = void_t();
+      return;
+    }
+
+    PCacheResponse response;
+    mResult = mCacheDBConnection->ReadResponse(aConnection, matches[0],
+                                               response);
+    if (NS_FAILED(mResult)) { return; }
+
+    mResponseOrVoid = response;
+  }
+
+  virtual void
+  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  {
+    nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
+    mCacheDBConnection->OnMatchComplete(mRequestId, rv, mResponseOrVoid);
+  }
+
+  const PCacheRequest mRequest;
+  const PCacheQueryParams mParams;
+  PCacheResponseOrVoid mResponseOrVoid;
+};
+
+class CacheDBConnection::MatchAllRunnable MOZ_FINAL :
+  public CacheDBConnection::OpenRunnable
+{
+public:
+  MatchAllRunnable(const nsACString& aOrigin, const nsACString& aBaseDomain,
+                   const nsACString& aQuotaId, const nsID& aCacheId,
+                   RequestId aRequestId, const PCacheRequestOrVoid& aRequestOrVoid,
+                   const PCacheQueryParams& aParams,
+                   CacheDBConnection* aCacheDBConnection)
+    : OpenRunnable(aOrigin, aBaseDomain, aQuotaId, false, aCacheId,
+                   aRequestId, aCacheDBConnection)
+    , mRequestOrVoid(aRequestOrVoid)
+    , mParams(aParams)
+  { }
+
+protected:
+  virtual ~MatchAllRunnable() { }
+
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
+  {
+    MOZ_ASSERT(aConnection);
+
+    nsTArray<EntryId> matches;
+    if (mRequestOrVoid.type() == PCacheRequestOrVoid::Tvoid_t) {
+      mResult = mCacheDBConnection->QueryAll(aConnection, matches);
+      if (NS_FAILED(mResult)) { return; }
+    } else {
+      mResult = mCacheDBConnection->QueryCache(aConnection, mRequestOrVoid,
+                                               mParams, matches);
+      if (NS_FAILED(mResult)) { return; }
+    }
+
+    // TODO: replace this with a bulk load using SQL IN clause
+    for (uint32_t i = 0; i < matches.Length(); ++i) {
+      PCacheResponse *response = mResponses.AppendElement();
+      if (!response) {
+        mResult = NS_ERROR_OUT_OF_MEMORY;
+        return;
+      }
+
+      mResult = mCacheDBConnection->ReadResponse(aConnection, matches[i],
+                                                 *response);
+      if (NS_FAILED(mResult)) { return; }
+    }
+  }
+
+  virtual void
+  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  {
+    nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
+    mCacheDBConnection->OnMatchAllComplete(mRequestId, rv, mResponses);
+  }
+
+  const PCacheRequestOrVoid mRequestOrVoid;
+  const PCacheQueryParams mParams;
+  nsTArray<PCacheResponse> mResponses;
+};
+
+class CacheDBConnection::PutRunnable MOZ_FINAL :
+  public CacheDBConnection::OpenRunnable
+{
+public:
+  PutRunnable(const nsACString& aOrigin, const nsACString& aBaseDomain,
+              const nsACString& aQuotaId, const nsID& aCacheId,
+              RequestId aRequestId, const PCacheRequest& aRequest,
+              const PCacheResponse& aResponse,
+              CacheDBConnection* aCacheDBConnection)
+    : OpenRunnable(aOrigin, aBaseDomain, aQuotaId, true, aCacheId,
+                   aRequestId, aCacheDBConnection)
+    , mRequest(aRequest)
+    , mResponse(aResponse)
+  { }
+
+protected:
+  virtual ~PutRunnable() { }
+
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
+  {
+    MOZ_ASSERT(aConnection);
+
+    PCacheQueryParams params(false, false, false, false, false,
+                             NS_LITERAL_STRING(""));
+
+    mozStorageTransaction trans(aConnection, false,
+                                mozIStorageConnection::TRANSACTION_IMMEDIATE);
+
+    nsTArray<EntryId> matches;
+    mResult = mCacheDBConnection->QueryCache(aConnection, mRequest, params,
+                                             matches);
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = mCacheDBConnection->DeleteEntries(aConnection, matches);
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = mCacheDBConnection->InsertEntry(aConnection, mRequest, mResponse);
+    if (NS_FAILED(mResult)) { return; }
+
+    mResult = trans.Commit();
+    if (NS_FAILED(mResult)) { return; }
+  }
+
+  virtual void
+  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  {
+    nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
+    PCacheResponseOrVoid responseOrVoid;
+    if (NS_FAILED(rv)) {
+      responseOrVoid = void_t();
+    } else {
+      responseOrVoid = mResponse;
+    }
+    mCacheDBConnection->OnPutComplete(mRequestId, rv, responseOrVoid);
+  }
+
+  const PCacheRequest mRequest;
+  const PCacheResponse mResponse;
+};
+
+class CacheDBConnection::DeleteRunnable MOZ_FINAL :
+  public CacheDBConnection::OpenRunnable
+{
+public:
+  DeleteRunnable(const nsACString& aOrigin, const nsACString& aBaseDomain,
+                 const nsACString& aQuotaId, const nsID& aCacheId,
+                 RequestId aRequestId, const PCacheRequest& aRequest,
+                 const PCacheQueryParams& aParams,
+                 CacheDBConnection* aCacheDBConnection)
+    : OpenRunnable(aOrigin, aBaseDomain, aQuotaId, false, aCacheId,
+                   aRequestId, aCacheDBConnection)
+    , mRequest(aRequest)
+    , mParams(aParams)
+    , mSuccess(false)
+  { }
+
+protected:
+  virtual ~DeleteRunnable() { }
+
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
+  {
+    MOZ_ASSERT(aConnection);
+
+    mozStorageTransaction trans(aConnection, false,
+                                mozIStorageConnection::TRANSACTION_IMMEDIATE);
+
+    nsTArray<EntryId> matches;
+    mResult = mCacheDBConnection->QueryCache(aConnection, mRequest, mParams,
+                                             matches);
+    if (NS_FAILED(mResult)) { return; }
+
+    if (matches.Length() > 0) {
+      mResult = mCacheDBConnection->DeleteEntries(aConnection, matches);
+      if (NS_FAILED(mResult)) { return; }
+
+      mResult = trans.Commit();
+      if (NS_FAILED(mResult)) { return; }
+
+      mSuccess = true;
+    }
+  }
+
+  virtual void
+  CompleteOnInitiatingThread(nsresult aRv) MOZ_OVERRIDE
+  {
+    nsresult rv = NS_FAILED(aRv) ? aRv : mResult;
+    mCacheDBConnection->OnDeleteComplete(mRequestId, rv, mSuccess);
+  }
+
+  const PCacheRequest mRequest;
+  const PCacheQueryParams mParams;
+  bool mSuccess;
+};
 
 //static
 already_AddRefed<CacheDBConnection>
-CacheDBConnection::Create(CacheDBListener& aListener, const nsACString& aOrigin,
+CacheDBConnection::Create(CacheDBListener* aListener, const nsACString& aOrigin,
        const nsACString& aBaseDomain)
 {
   nsresult rv;
@@ -84,315 +497,113 @@ CacheDBConnection::Create(CacheDBListener& aListener, const nsACString& aOrigin,
     return nullptr;
   }
 
-  return GetOrCreateInternal(aListener, aOrigin, aBaseDomain, cacheId, true);
+  nsRefPtr<CacheDBConnection> ref = new CacheDBConnection(aListener, aOrigin,
+                                                          aBaseDomain, cacheId);
+  return ref.forget();
 }
 
-CacheDBConnection::CacheDBConnection(CacheDBListener& aListener,
-                                     const nsID& aCacheId,
-                                     already_AddRefed<mozIStorageConnection> aConnection)
+CacheDBConnection::CacheDBConnection(CacheDBListener* aListener,
+                                     const nsACString& aOrigin,
+                                     const nsACString& aBaseDomain,
+                                     const nsID& aCacheId)
   : mListener(aListener)
+  , mOrigin(aOrigin)
+  , mBaseDomain(aBaseDomain)
   , mCacheId(aCacheId)
-  , mConnection(aConnection)
+  , mQuotaId("Cache:")
 {
+  MOZ_ASSERT(mListener);
+
+  char cacheIdBuf[NSID_LENGTH];
+  mCacheId.ToProvidedString(cacheIdBuf);
+  mQuotaId.Append(cacheIdBuf);
 }
 
-CacheDBConnection::~CacheDBConnection()
+void
+CacheDBConnection::ClearListener()
 {
+  MOZ_ASSERT(mListener);
+  mListener = nullptr;
 }
 
-nsresult
-CacheDBConnection::Match(cache::RequestId aRequestId,
-                         const PCacheRequest& aRequest,
+void
+CacheDBConnection::Match(RequestId aRequestId, const PCacheRequest& aRequest,
                          const PCacheQueryParams& aParams)
 {
-  nsTArray<EntryId> matches;
-  nsresult rv = QueryCache(aRequest, aParams, matches);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  PCacheResponseOrVoid responseOrVoid;
-
-  if (matches.Length() < 1) {
-    responseOrVoid = void_t();
-    mListener.OnMatch(aRequestId, responseOrVoid);
-    return NS_OK;
+  nsRefPtr<MatchRunnable> match = new MatchRunnable(mOrigin, mBaseDomain, mQuotaId,
+                                                    mCacheId, aRequestId, aRequest,
+                                                    aParams, this);
+  if (!match) {
+    OnMatchComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY,
+                    PCacheResponseOrVoid(void_t()));
+    return;
   }
-
-  PCacheResponse response;
-  rv = ReadResponse(matches[0], response);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  responseOrVoid = response;
-  mListener.OnMatch(aRequestId, responseOrVoid);
-
-  return NS_OK;
+  match->Dispatch();
 }
 
-nsresult
+void
 CacheDBConnection::MatchAll(RequestId aRequestId,
                             const PCacheRequestOrVoid& aRequest,
                             const PCacheQueryParams& aParams)
 {
-  nsTArray<PCacheResponse> responses;
-  nsTArray<EntryId> matches;
-  nsresult rv;
-
-  if (aRequest.type() == PCacheRequestOrVoid::Tvoid_t) {
-    rv = QueryAll(matches);
-    NS_ENSURE_SUCCESS(rv, rv);
-  } else {
-    rv = QueryCache(aRequest, aParams, matches);
-    NS_ENSURE_SUCCESS(rv, rv);
+  nsRefPtr<MatchAllRunnable> match = new MatchAllRunnable(mOrigin, mBaseDomain,
+                                                          mQuotaId, mCacheId,
+                                                          aRequestId, aRequest,
+                                                          aParams, this);
+  if (!match) {
+    OnMatchAllComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY,
+                       nsTArray<PCacheResponse>());
+    return;
   }
-
-  // TODO: replace this with a bulk load using SQL IN clause
-  for (uint32_t i = 0; i < matches.Length(); ++i) {
-    PCacheResponse *response = responses.AppendElement();
-    NS_ENSURE_TRUE(response, NS_ERROR_OUT_OF_MEMORY);
-
-    rv = ReadResponse(matches[i], *response);
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
-
-  mListener.OnMatchAll(aRequestId, responses);
-  return NS_OK;
+  match->Dispatch();
 }
 
 // TODO: Make sure AddAll() doesn't delete entries it just created.
 
-nsresult
+void
 CacheDBConnection::Put(RequestId aRequestId, const PCacheRequest& aRequest,
                        const PCacheResponse& aResponse)
 {
-  if (!aRequest.method().LowerCaseEqualsLiteral("get")) {
-    return NS_ERROR_FAILURE;
+  nsRefPtr<PutRunnable> put = new PutRunnable(mOrigin, mBaseDomain, mQuotaId,
+                                              mCacheId, aRequestId, aRequest,
+                                              aResponse, this);
+  if (!put) {
+    OnPutComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY,
+                  PCacheResponseOrVoid(void_t()));
+    return;
   }
-
-  PCacheQueryParams params(false, false, false, false, false,
-                           NS_LITERAL_STRING(""));
-
-  mozStorageTransaction trans(mConnection, false,
-                              mozIStorageConnection::TRANSACTION_IMMEDIATE);
-
-  nsTArray<EntryId> matches;
-  nsresult rv = QueryCache(aRequest, params, matches);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = DeleteEntries(matches);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = InsertEntry(aRequest, aResponse);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = trans.Commit();
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  PCacheResponseOrVoid response(aResponse);
-  mListener.OnPut(aRequestId, response);
-
-  return NS_OK;
+  put->Dispatch();
 }
 
-nsresult
+void
 CacheDBConnection::Delete(cache::RequestId aRequestId,
                           const PCacheRequest& aRequest,
                           const PCacheQueryParams& aParams)
 {
-  PCacheQueryParams params;
-
-  mozStorageTransaction trans(mConnection, false,
-                              mozIStorageConnection::TRANSACTION_IMMEDIATE);
-
-  nsTArray<EntryId> matches;
-  nsresult rv = QueryCache(aRequest, aParams, matches);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  if (matches.Length() > 0) {
-    rv = DeleteEntries(matches);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    rv = trans.Commit();
-    NS_ENSURE_SUCCESS(rv, rv);
+  nsRefPtr<DeleteRunnable> del = new DeleteRunnable(mOrigin, mBaseDomain,
+                                                    mQuotaId, mCacheId,
+                                                    aRequestId, aRequest,
+                                                    aParams, this);
+  if (!del) {
+    OnDeleteComplete(aRequestId, NS_ERROR_OUT_OF_MEMORY, false);
+    return;
   }
-
-  mListener.OnDelete(aRequestId, matches.Length() > 0);
-
-  return NS_OK;
+  del->Dispatch();
 }
 
-//static
-already_AddRefed<CacheDBConnection>
-CacheDBConnection::GetOrCreateInternal(CacheDBListener& aListener,
-                                       const nsACString& aOrigin,
-                                       const nsACString& aBaseDomain,
-                                       const nsID& aCacheId,
-                                       bool allowCreate)
+CacheDBConnection::~CacheDBConnection()
 {
-  QuotaManager* quota = QuotaManager::Get();
-  MOZ_ASSERT(quota);
-
-  const PersistenceType persistenceType = PERSISTENCE_TYPE_PERSISTENT;
-
-  nsCOMPtr<nsIFile> dbDir;
-  nsresult rv = quota->GetDirectoryForOrigin(persistenceType,
-                                             aOrigin,
-                                             getter_AddRefs(dbDir));
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  rv = dbDir->Append(NS_LITERAL_STRING("cache"));
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  rv = dbDir->Append(NS_ConvertUTF8toUTF16(aCacheId.ToString()));
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  bool exists;
-  rv = dbDir->Exists(&exists);
-  NS_ENSURE_SUCCESS(rv, nullptr);
-  NS_ENSURE_TRUE(exists || allowCreate, nullptr);
-
-  if (!exists) {
-    rv = dbDir->Create(nsIFile::DIRECTORY_TYPE, 0755);
-    NS_ENSURE_SUCCESS(rv, nullptr);
-  }
-
-  nsCOMPtr<nsIFile> dbFile;
-  rv = dbDir->Clone(getter_AddRefs(dbFile));
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  rv = dbFile->Append(NS_LITERAL_STRING("db.sqlite"));
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  rv = dbFile->Exists(&exists);
-  NS_ENSURE_SUCCESS(rv, nullptr);
-  NS_ENSURE_TRUE(exists || allowCreate, nullptr);
-
-  // XXX: Jonas tells me nsIFileURL usage off-main-thread is dangerous,
-  //      but this is what IDB does to access mozIStorageConnection so
-  //      it seems at least this corner case mostly works.
-
-  nsCOMPtr<nsIFile> dbTmpDir;
-  rv = dbDir->Clone(getter_AddRefs(dbTmpDir));
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  rv = dbTmpDir->Append(NS_LITERAL_STRING("db"));
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  nsCOMPtr<nsIURI> uri;
-  rv = NS_NewFileURI(getter_AddRefs(uri), dbFile);
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  nsCOMPtr<nsIFileURL> dbFileUrl = do_QueryInterface(uri);
-  NS_ENSURE_TRUE(dbFileUrl, nullptr);
-
-  nsAutoCString type;
-  PersistenceTypeToText(persistenceType, type);
-
-  rv = dbFileUrl->SetQuery(NS_LITERAL_CSTRING("persistenceType=") + type +
-                           NS_LITERAL_CSTRING("&group=") + aBaseDomain +
-                           NS_LITERAL_CSTRING("&origin=") + aOrigin);
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  nsCOMPtr<mozIStorageService> ss =
-    do_GetService(MOZ_STORAGE_SERVICE_CONTRACTID);
-  NS_ENSURE_TRUE(ss, nullptr);
-
-  nsCOMPtr<mozIStorageConnection> conn;
-  rv = ss->OpenDatabaseWithFileURL(dbFileUrl, getter_AddRefs(conn));
-  if (rv == NS_ERROR_FILE_CORRUPTED) {
-    dbFile->Remove(false);
-    NS_ENSURE_SUCCESS(rv, nullptr);
-
-    rv = dbTmpDir->Exists(&exists);
-    NS_ENSURE_SUCCESS(rv, nullptr);
-
-    if (exists) {
-      bool isDir;
-      rv = dbTmpDir->IsDirectory(&isDir);
-      NS_ENSURE_SUCCESS(rv, nullptr);
-      NS_ENSURE_TRUE(isDir, nullptr);
-      rv = dbTmpDir->Remove(true);
-      NS_ENSURE_SUCCESS(rv, nullptr);
-    }
-  }
-  NS_ENSURE_SUCCESS(rv, nullptr);
-  NS_ENSURE_TRUE(conn, nullptr);
-
-  rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
-    // Switch the journaling mode to TRUNCATE to avoid changing the directory
-    // structure at the conclusion of every transaction for devices with slower
-    // file systems.
-    "PRAGMA journal_mode = TRUNCATE; "
-#endif
-    "PRAGMA foreign_keys = ON; "
-  ));
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  int32_t schemaVersion;
-  rv = conn->GetSchemaVersion(&schemaVersion);
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  mozStorageTransaction trans(conn, false,
-                              mozIStorageConnection::TRANSACTION_IMMEDIATE);
-
-  if (!schemaVersion) {
-    rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-      "CREATE TABLE map ("
-        "id INTEGER NOT NULL PRIMARY KEY, "
-        "request_method TEXT NOT NULL, "
-        "request_url TEXT NOT NULL, "
-        "request_url_no_query TEXT NOT NULL, "
-        "request_mode INTEGER NOT NULL, "
-        "request_credentials INTEGER NOT NULL, "
-        //"request_body_file TEXT NOT NULL, "
-        "response_type INTEGER NOT NULL, "
-        "response_status INTEGER NOT NULL, "
-        "response_status_text TEXT NOT NULL "
-        //"response_body_file TEXT NOT NULL "
-      ");"
-    ));
-    NS_ENSURE_SUCCESS(rv, nullptr);
-
-    rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-      "CREATE TABLE request_headers ("
-        "name TEXT NOT NULL, "
-        "value TEXT NOT NULL, "
-        "map_id INTEGER NOT NULL REFERENCES map(id) "
-      ");"
-    ));
-    NS_ENSURE_SUCCESS(rv, nullptr);
-
-    rv = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-      "CREATE TABLE response_headers ("
-        "name TEXT NOT NULL, "
-        "value TEXT NOT NULL, "
-        "map_id INTEGER NOT NULL REFERENCES map(id) "
-      ");"
-    ));
-    NS_ENSURE_SUCCESS(rv, nullptr);
-
-    conn->SetSchemaVersion(kLatestSchemaVersion);
-    NS_ENSURE_SUCCESS(rv, nullptr);
-
-    rv = conn->GetSchemaVersion(&schemaVersion);
-    NS_ENSURE_SUCCESS(rv, nullptr);
-  }
-
-  NS_ENSURE_TRUE(schemaVersion == kLatestSchemaVersion, nullptr);
-
-  rv = trans.Commit();
-  NS_ENSURE_SUCCESS(rv, nullptr);
-
-  nsRefPtr<CacheDBConnection> ref = new CacheDBConnection(aListener,
-                                                          aCacheId,
-                                                          conn.forget());
-  return ref.forget();
+  MOZ_ASSERT(!mListener);
 }
 
 nsresult
-CacheDBConnection::QueryAll(nsTArray<EntryId>& aEntryIdListOut)
+CacheDBConnection::QueryAll(mozIStorageConnection* aConnection,
+                            nsTArray<EntryId>& aEntryIdListOut)
 {
+  MOZ_ASSERT(aConnection);
+
   nsCOMPtr<mozIStorageStatement> statement;
-  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  nsresult rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "SELECT id FROM map"
   ), getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
@@ -409,10 +620,13 @@ CacheDBConnection::QueryAll(nsTArray<EntryId>& aEntryIdListOut)
 }
 
 nsresult
-CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
+CacheDBConnection::QueryCache(mozIStorageConnection* aConnection,
+                              const PCacheRequest& aRequest,
                               const PCacheQueryParams& aParams,
                               nsTArray<EntryId>& aEntryIdListOut)
 {
+  MOZ_ASSERT(aConnection);
+
   nsTArray<PCacheRequest> requestArray;
   nsTArray<PCacheResponse> responseArray;
 
@@ -453,7 +667,7 @@ CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
   query.Append(NS_LITERAL_CSTRING(" GROUP BY map.id ORDER BY map.id"));
 
   nsCOMPtr<mozIStorageStatement> statement;
-  nsresult rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
+  nsresult rv = aConnection->CreateStatement(query, getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (aParams.prefixMatch()) {
@@ -477,7 +691,7 @@ CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (!aParams.ignoreVary() && varyCount > 0 &&
-        !MatchByVaryHeader(aRequest, entryId)) {
+        !MatchByVaryHeader(aConnection, aRequest, entryId)) {
       continue;
     }
 
@@ -488,11 +702,14 @@ CacheDBConnection::QueryCache(const PCacheRequest& aRequest,
 }
 
 bool
-CacheDBConnection::MatchByVaryHeader(const PCacheRequest& aRequest,
+CacheDBConnection::MatchByVaryHeader(mozIStorageConnection* aConnection,
+                                     const PCacheRequest& aRequest,
                                      EntryId entryId)
 {
+  MOZ_ASSERT(aConnection);
+
   nsCOMPtr<mozIStorageStatement> statement;
-  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  nsresult rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "SELECT value FROM response_headers "
     "WHERE name='vary' AND map_id=?1"
   ), getter_AddRefs(statement));
@@ -519,7 +736,7 @@ CacheDBConnection::MatchByVaryHeader(const PCacheRequest& aRequest,
   MOZ_ASSERT(varyValues.Length() > 0);
 
   statement->Reset();
-  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "SELECT name, value FROM request_headers "
     "WHERE AND map_id=?1"
   ), getter_AddRefs(statement));
@@ -571,11 +788,11 @@ CacheDBConnection::MatchByVaryHeader(const PCacheRequest& aRequest,
 }
 
 nsresult
-CacheDBConnection::DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
+CacheDBConnection::DeleteEntries(mozIStorageConnection* aConnection,
+                                 const nsTArray<EntryId>& aEntryIdList,
                                  uint32_t aPos, int32_t aLen)
 {
-  // TODO: do this async
-  // TODO: use a transaction
+  MOZ_ASSERT(aConnection);
 
   if (aEntryIdList.Length() < 1) {
     return NS_OK;
@@ -594,7 +811,7 @@ CacheDBConnection::DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
     int32_t remaining = aLen;
     while (remaining > 0) {
       int32_t curLen = std::min(MAX_ENTRIES_PER_STATEMENT, remaining);
-      nsresult rv = DeleteEntries(aEntryIdList, curPos, curLen);
+      nsresult rv = DeleteEntries(aConnection, aEntryIdList, curPos, curLen);
       NS_ENSURE_SUCCESS(rv, rv);
 
       curPos += curLen;
@@ -610,7 +827,7 @@ CacheDBConnection::DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
   AppendListParamsToQuery(query, aEntryIdList, aPos, aLen);
   query.Append(NS_LITERAL_CSTRING(")"));
 
-  nsresult rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
+  nsresult rv = aConnection->CreateStatement(query, getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
 
   rv = BindListParamsToQuery(statement, aEntryIdList, aPos, aLen);
@@ -626,7 +843,7 @@ CacheDBConnection::DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
   AppendListParamsToQuery(query, aEntryIdList, aPos, aLen);
   query.Append(NS_LITERAL_CSTRING(")"));
 
-  rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
+  rv = aConnection->CreateStatement(query, getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
 
   rv = BindListParamsToQuery(statement, aEntryIdList, aPos, aLen);
@@ -642,7 +859,7 @@ CacheDBConnection::DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
   AppendListParamsToQuery(query, aEntryIdList, aPos, aLen);
   query.Append(NS_LITERAL_CSTRING(")"));
 
-  rv = mConnection->CreateStatement(query, getter_AddRefs(statement));
+  rv = aConnection->CreateStatement(query, getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
 
   rv = BindListParamsToQuery(statement, aEntryIdList, aPos, aLen);
@@ -655,12 +872,14 @@ CacheDBConnection::DeleteEntries(const nsTArray<EntryId>& aEntryIdList,
 }
 
 nsresult
-CacheDBConnection::InsertEntry(const PCacheRequest& aRequest,
+CacheDBConnection::InsertEntry(mozIStorageConnection* aConnection,
+                               const PCacheRequest& aRequest,
                                const PCacheResponse& aResponse)
 {
-  nsCOMPtr<mozIStorageStatement> statement;
+  MOZ_ASSERT(aConnection);
 
-  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  nsCOMPtr<mozIStorageStatement> statement;
+  nsresult rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "INSERT INTO map ("
       "request_method, "
       "request_url, "
@@ -702,7 +921,7 @@ CacheDBConnection::InsertEntry(const PCacheRequest& aRequest,
   rv = statement->Execute();
   NS_ENSURE_SUCCESS(rv, rv);
 
-  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "SELECT last_insert_rowid()"
   ), getter_AddRefs(statement));
   NS_ENSURE_SUCCESS(rv, rv);
@@ -715,7 +934,7 @@ CacheDBConnection::InsertEntry(const PCacheRequest& aRequest,
   rv = statement->GetInt32(0, &mapId);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "INSERT INTO request_headers ("
       "name, "
       "value, "
@@ -739,7 +958,7 @@ CacheDBConnection::InsertEntry(const PCacheRequest& aRequest,
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
-  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "INSERT INTO response_headers ("
       "name, "
       "value, "
@@ -767,10 +986,12 @@ CacheDBConnection::InsertEntry(const PCacheRequest& aRequest,
 }
 
 nsresult
-CacheDBConnection::ReadResponse(EntryId aEntryId, PCacheResponse& aResponseOut)
+CacheDBConnection::ReadResponse(mozIStorageConnection* aConnection,
+                                EntryId aEntryId, PCacheResponse& aResponseOut)
 {
+  MOZ_ASSERT(aConnection);
   nsCOMPtr<mozIStorageStatement> statement;
-  nsresult rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  nsresult rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "SELECT "
       "response_type, "
       "response_status, "
@@ -800,7 +1021,7 @@ CacheDBConnection::ReadResponse(EntryId aEntryId, PCacheResponse& aResponseOut)
   rv = statement->GetUTF8String(2, aResponseOut.statusText());
   NS_ENSURE_SUCCESS(rv, rv);
 
-  rv = mConnection->CreateStatement(NS_LITERAL_CSTRING(
+  rv = aConnection->CreateStatement(NS_LITERAL_CSTRING(
     "SELECT "
       "name, "
       "value "
@@ -825,6 +1046,43 @@ CacheDBConnection::ReadResponse(EntryId aEntryId, PCacheResponse& aResponseOut)
 
   return NS_OK;
 }
+
+void
+CacheDBConnection::OnMatchComplete(RequestId aRequestId, nsresult aRv,
+                                   const PCacheResponseOrVoid& aResponse)
+{
+  if (mListener) {
+    mListener->OnMatch(aRequestId, aRv, aResponse);
+  }
+}
+
+void
+CacheDBConnection::OnMatchAllComplete(RequestId aRequestId, nsresult aRv,
+                                      const nsTArray<PCacheResponse>& aResponses)
+{
+  if (mListener) {
+    mListener->OnMatchAll(aRequestId, aRv, aResponses);
+  }
+}
+
+void
+CacheDBConnection::OnPutComplete(RequestId aRequestId, nsresult aRv,
+                                 const PCacheResponseOrVoid& aResponse)
+{
+  if (mListener) {
+    mListener->OnPut(aRequestId, aRv, aResponse);
+  }
+}
+
+void
+CacheDBConnection::OnDeleteComplete(RequestId aRequestId, nsresult aRv,
+                                    bool aSuccess)
+{
+  if (mListener) {
+    mListener->OnDelete(aRequestId, aRv, aSuccess);
+  }
+}
+
 
 } // namespace dom
 } // namespace mozilla

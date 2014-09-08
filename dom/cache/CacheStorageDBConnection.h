@@ -25,8 +25,7 @@ public:
   CacheStorageDBConnection(CacheStorageDBListener* aListener,
                            cache::Namespace aNamespace,
                            const nsACString& aOrigin,
-                           const nsACString& aBaseDomain,
-                           bool aAllowCreate);
+                           const nsACString& aBaseDomain);
 
   void ClearListener();
 
@@ -59,9 +58,6 @@ private:
   const cache::Namespace mNamespace;
   const nsCString mOrigin;
   const nsCString mBaseDomain;
-  nsCOMPtr<nsIThread> mOwningThread;
-  nsCOMPtr<mozIStorageConnection> mConnection;
-  bool mFailed;
 
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CacheStorageDBConnection)

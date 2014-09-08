@@ -131,8 +131,11 @@ protected:
         mResult = dbTmpDir->Remove(true);
         if (NS_FAILED(mResult)) { return; }
       }
+
+      mResult = ss->OpenDatabaseWithFileURL(dbFileUrl, getter_AddRefs(conn));
     }
     if (NS_FAILED(mResult)) { return; }
+    MOZ_ASSERT(conn);
 
   #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
     mResult = conn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
@@ -205,7 +208,8 @@ public:
   { }
 
 protected:
-  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
     MOZ_ASSERT(aConnection);
 
@@ -271,7 +275,8 @@ public:
   { }
 
 protected:
-  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
     MOZ_ASSERT(aConnection);
 
@@ -324,7 +329,8 @@ public:
   { }
 
 protected:
-  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
     MOZ_ASSERT(aConnection);
 
@@ -379,7 +385,8 @@ public:
   { }
 
 protected:
-  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
     MOZ_ASSERT(aConnection);
 
@@ -425,7 +432,8 @@ public:
   { }
 
 protected:
-  virtual void AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection)
+  virtual void
+  AfterOpenOnQuotaIOThread(mozIStorageConnection* aConnection) MOZ_OVERRIDE
   {
     MOZ_ASSERT(aConnection);
 
@@ -468,17 +476,13 @@ CacheStorageDBConnection::
 CacheStorageDBConnection(CacheStorageDBListener* aListener,
                          Namespace aNamespace,
                          const nsACString& aOrigin,
-                         const nsACString& aBaseDomain,
-                         bool aAllowCreate)
+                         const nsACString& aBaseDomain)
   : mListener(aListener)
   , mNamespace(aNamespace)
   , mOrigin(aOrigin)
   , mBaseDomain(aBaseDomain)
-  , mOwningThread(NS_GetCurrentThread())
-  , mFailed(false)
 {
   MOZ_ASSERT(mListener);
-  MOZ_ASSERT(mOwningThread);
 }
 
 void

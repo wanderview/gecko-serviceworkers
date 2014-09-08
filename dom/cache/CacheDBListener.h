@@ -22,18 +22,14 @@ class CacheDBListener
   public:
     virtual ~CacheDBListener() { }
 
-    virtual void OnError(cache::RequestId aRequestId, nsresult aRv)=0;
-
-    virtual void OnMatch(cache::RequestId aRequestId,
-                         PCacheResponseOrVoid& aResponse)=0;
-    virtual void OnMatchAll(cache::RequestId aRequestId,
+    virtual void OnMatch(cache::RequestId aRequestId, nsresult aRv,
+                         const PCacheResponseOrVoid& aResponse)=0;
+    virtual void OnMatchAll(cache::RequestId aRequestId, nsresult aRv,
                             const nsTArray<PCacheResponse>& aResponses)=0;
-    virtual void OnPut(cache::RequestId aRequestId,
+    virtual void OnPut(cache::RequestId aRequestId, nsresult aRv,
                        const PCacheResponseOrVoid& aResponse)=0;
-    virtual void OnDelete(cache::RequestId aRequestId, bool aResult)=0;
-
-    // TODO: OnConnected
-    // TODO: OnError (or pass nsresult in each On*() method?
+    virtual void OnDelete(cache::RequestId aRequestId, nsresult aRv,
+                          bool aSuccess)=0;
 };
 
 } // namespace dom

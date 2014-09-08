@@ -19,7 +19,7 @@ CacheParent::CacheParent(const nsACString& aOrigin,
                          const nsACString& aBaseDomain)
   : mOrigin(aOrigin)
   , mBaseDomain(aBaseDomain)
-  , mDBConnection(CacheDBConnection::Create(*this, aOrigin, aBaseDomain))
+  , mDBConnection(CacheDBConnection::Create(this, aOrigin, aBaseDomain))
 {
 }
 
@@ -28,18 +28,22 @@ CacheParent::CacheParent(const nsACString& aOrigin,
                          const nsID& aExistingCacheId)
   : mOrigin(aOrigin)
   , mBaseDomain(aBaseDomain)
-  , mDBConnection(CacheDBConnection::Get(*this, aOrigin, aBaseDomain,
-                                         aExistingCacheId))
+  , mDBConnection(new CacheDBConnection(this, aOrigin, aBaseDomain,
+                                        aExistingCacheId))
 {
 }
 
 CacheParent::~CacheParent()
 {
+  MOZ_ASSERT(!mDBConnection);
 }
 
 void
 CacheParent::ActorDestroy(ActorDestroyReason aReason)
 {
+  MOZ_ASSERT(mDBConnection);
+  mDBConnection->ClearListener();
+  mDBConnection = nullptr;
 }
 
 bool
@@ -47,13 +51,7 @@ CacheParent::RecvMatch(const RequestId& aRequestId, const PCacheRequest& aReques
                        const PCacheQueryParams& aParams)
 {
   MOZ_ASSERT(mDBConnection);
-  nsresult rv = mDBConnection->MatchAll(aRequestId, aRequest, aParams);
-  if (NS_FAILED(rv)) {
-    PCacheResponseOrVoid responseOrVoid;
-    responseOrVoid = void_t();
-    unused << SendMatchResponse(aRequestId, responseOrVoid);
-  }
-
+  mDBConnection->Match(aRequestId, aRequest, aParams);
   return true;
 }
 
@@ -63,12 +61,7 @@ CacheParent::RecvMatchAll(const RequestId& aRequestId,
                           const PCacheQueryParams& aParams)
 {
   MOZ_ASSERT(mDBConnection);
-  nsresult rv = mDBConnection->MatchAll(aRequestId, aRequest, aParams);
-  if (NS_FAILED(rv)) {
-    nsTArray<PCacheResponse> emptyResponses;
-    unused << SendMatchAllResponse(aRequestId, emptyResponses);
-  }
-
+  mDBConnection->MatchAll(aRequestId, aRequest, aParams);
   return true;
 }
 
@@ -90,13 +83,7 @@ CacheParent::RecvPut(const RequestId& aRequestId, const PCacheRequest& aRequest,
                      const PCacheResponse& aResponse)
 {
   MOZ_ASSERT(mDBConnection);
-  nsresult rv = mDBConnection->Put(aRequestId, aRequest, aResponse);
-  if (NS_FAILED(rv)) {
-    PCacheResponseOrVoid response;
-    response = void_t();
-    unused << SendPutResponse(aRequestId, response);
-  }
-
+  mDBConnection->Put(aRequestId, aRequest, aResponse);
   return true;
 }
 
@@ -106,11 +93,7 @@ CacheParent::RecvDelete(const RequestId& aRequestId,
                         const PCacheQueryParams& aParams)
 {
   MOZ_ASSERT(mDBConnection);
-  nsresult rv = mDBConnection->Delete(aRequestId, aRequest, aParams);
-  if (NS_FAILED(rv)) {
-    unused << SendDeleteResponse(aRequestId, false);
-  }
-
+  mDBConnection->Delete(aRequestId, aRequest, aParams);
   return true;
 }
 
@@ -123,35 +106,31 @@ CacheParent::RecvKeys(const RequestId& aRequestId,
 }
 
 void
-CacheParent::OnError(cache::RequestId aRequestId, nsresult aRv)
+CacheParent::OnMatch(cache::RequestId aRequestId, nsresult aRv,
+                     const PCacheResponseOrVoid& aResponse)
 {
-  MOZ_CRASH("implement me");
+  unused << SendMatchResponse(aRequestId, aRv, aResponse);
 }
 
 void
-CacheParent::OnMatch(cache::RequestId aRequestId,
-                     PCacheResponseOrVoid& aResponse)
-{
-  unused << SendMatchResponse(aRequestId, aResponse);
-}
-
-void
-CacheParent::OnMatchAll(cache::RequestId aRequestId,
+CacheParent::OnMatchAll(cache::RequestId aRequestId, nsresult aRv,
                         const nsTArray<PCacheResponse>& aResponses)
 {
-  unused << SendMatchAllResponse(aRequestId, aResponses);
+  unused << SendMatchAllResponse(aRequestId, aRv, aResponses);
 }
 
 void
-CacheParent::OnPut(RequestId aRequestId, const PCacheResponseOrVoid& aResponse)
+CacheParent::OnPut(RequestId aRequestId, nsresult aRv,
+                   const PCacheResponseOrVoid& aResponse)
 {
-  unused << SendPutResponse(aRequestId, aResponse);
+  unused << SendPutResponse(aRequestId, aRv, aResponse);
 }
 
 void
-CacheParent::OnDelete(RequestId aRequestId, bool aResult)
+CacheParent::OnDelete(RequestId aRequestId, nsresult aRv,
+                      bool aSuccess)
 {
-  unused << SendDeleteResponse(aRequestId, aResult);
+  unused << SendDeleteResponse(aRequestId, aRv, aSuccess);
 }
 
 } // namespace dom

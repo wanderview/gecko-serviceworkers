@@ -29,26 +29,26 @@ public:
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor)=0;
 
   virtual void
-  RecvMatchResponse(cache::RequestId requestId,
-                    const PCacheResponseOrVoid& response)=0;
+  RecvMatchResponse(cache::RequestId aRequestId, nsresult aRv,
+                    const PCacheResponseOrVoid& aResponse)=0;
   virtual void
-  RecvMatchAllResponse(cache::RequestId requestId,
-                       const nsTArray<PCacheResponse>& responses)=0;
+  RecvMatchAllResponse(cache::RequestId aRequestId, nsresult aRv,
+                       const nsTArray<PCacheResponse>& aResponses)=0;
   virtual void
-  RecvAddResponse(cache::RequestId requestId,
-                  const PCacheResponse& response)=0;
+  RecvAddResponse(cache::RequestId aRequestId, nsresult aRv,
+                  const PCacheResponse& aResponse)=0;
   virtual void
-  RecvAddAllResponse(cache::RequestId requestId,
-                     const nsTArray<PCacheResponse>& responses)=0;
+  RecvAddAllResponse(cache::RequestId aRequestId, nsresult aRv,
+                     const nsTArray<PCacheResponse>& aResponses)=0;
   virtual void
-  RecvPutResponse(cache::RequestId requestId,
-                  const PCacheResponseOrVoid& response)=0;
+  RecvPutResponse(cache::RequestId aRequestId, nsresult aRv,
+                  const PCacheResponseOrVoid& aResponse)=0;
   virtual void
-  RecvDeleteResponse(cache::RequestId requestId,
-                     bool result)=0;
+  RecvDeleteResponse(cache::RequestId aRequestId, nsresult aRv,
+                     bool aSuccess)=0;
   virtual void
-  RecvKeysResponse(cache::RequestId requestId,
-                   const nsTArray<PCacheRequest>& requests)=0;
+  RecvKeysResponse(cache::RequestId aRequestId, nsresult aRv,
+                   const nsTArray<PCacheRequest>& aRequests)=0;
 };
 
 } // namespace dom

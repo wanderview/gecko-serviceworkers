@@ -26,13 +26,13 @@ parent:
   Keys(RequestId requestId, PCacheRequestOrVoid request, PCacheQueryParams params);
 
 child:
-  MatchResponse(RequestId requestId, PCacheResponseOrVoid response);
-  MatchAllResponse(RequestId requestId, PCacheResponse[] responses);
-  AddResponse(RequestId requestId, PCacheResponse response);
-  AddAllResponse(RequestId requestId, PCacheResponse[] responses);
-  PutResponse(RequestId requestId, PCacheResponseOrVoid response);
-  DeleteResponse(RequestId requestId, bool result);
-  KeysResponse(RequestId requestId, PCacheRequest[] requests);
+  MatchResponse(RequestId requestId, nsresult aRv, PCacheResponseOrVoid response);
+  MatchAllResponse(RequestId requestId, nsresult aRv, PCacheResponse[] responses);
+  AddResponse(RequestId requestId, nsresult aRv, PCacheResponse response);
+  AddAllResponse(RequestId requestId, nsresult aRv, PCacheResponse[] responses);
+  PutResponse(RequestId requestId, nsresult aRv, PCacheResponseOrVoid response);
+  DeleteResponse(RequestId requestId, nsresult aRv, bool success);
+  KeysResponse(RequestId requestId, nsresult aRv, PCacheRequest[] requests);
 
 both:
   __delete__();

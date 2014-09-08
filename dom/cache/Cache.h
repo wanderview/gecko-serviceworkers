@@ -69,25 +69,26 @@ public:
   // CacheChildListener methods
   virtual void ActorDestroy(mozilla::ipc::IProtocol& aActor) MOZ_OVERRIDE;
   virtual void
-  RecvMatchResponse(cache::RequestId requestId,
-                    const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
+  RecvMatchResponse(cache::RequestId aRequestId, nsresult aRv,
+                    const PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
   virtual void
-  RecvMatchAllResponse(cache::RequestId requestId,
-                       const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
+  RecvMatchAllResponse(cache::RequestId aRequestId, nsresult aRv,
+                       const nsTArray<PCacheResponse>& aResponses) MOZ_OVERRIDE;
   virtual void
-  RecvAddResponse(cache::RequestId requestId,
-                  const PCacheResponse& response) MOZ_OVERRIDE;
+  RecvAddResponse(cache::RequestId aRequestId, nsresult aRv,
+                  const PCacheResponse& aResponse) MOZ_OVERRIDE;
   virtual void
-  RecvAddAllResponse(cache::RequestId requestId,
-                     const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
+  RecvAddAllResponse(cache::RequestId aRequestId, nsresult aRv,
+                     const nsTArray<PCacheResponse>& aResponses) MOZ_OVERRIDE;
   virtual void
-  RecvPutResponse(cache::RequestId requestId,
-                  const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
+  RecvPutResponse(cache::RequestId aRequestId, nsresult aRv,
+                  const PCacheResponseOrVoid& aResponse) MOZ_OVERRIDE;
   virtual void
-  RecvDeleteResponse(cache::RequestId requestId, bool result) MOZ_OVERRIDE;
+  RecvDeleteResponse(cache::RequestId aRequestId, nsresult aRv,
+                     bool aSuccess) MOZ_OVERRIDE;
   virtual void
-  RecvKeysResponse(cache::RequestId requestId,
-                   const nsTArray<PCacheRequest>& requests) MOZ_OVERRIDE;
+  RecvKeysResponse(cache::RequestId aRequestId, nsresult aRv,
+                   const nsTArray<PCacheRequest>& aRequests) MOZ_OVERRIDE;
 
 private:
   virtual ~Cache();

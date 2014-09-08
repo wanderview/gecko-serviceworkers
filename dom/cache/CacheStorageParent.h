@@ -52,9 +52,6 @@ public:
                       const nsTArray<nsString>& aKeys) MOZ_OVERRIDE;
 
 private:
-  CacheStorageDBConnection* GetDBConnection();
-  CacheStorageDBConnection* GetOrCreateDBConnection();
-
   const cache::Namespace mNamespace;
   const nsCString mOrigin;
   const nsCString mBaseDomain;

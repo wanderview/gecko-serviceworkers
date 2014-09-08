@@ -29,25 +29,25 @@ public:
 
   // PCacheChild methods
   virtual bool
-  RecvMatchResponse(const RequestId& requestId,
+  RecvMatchResponse(const RequestId& requestId, const nsresult& aRv,
                     const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
   virtual bool
-  RecvMatchAllResponse(const RequestId& requestId,
+  RecvMatchAllResponse(const RequestId& requestId, const nsresult& aRv,
                        const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
   virtual bool
-  RecvAddResponse(const RequestId& requestId,
+  RecvAddResponse(const RequestId& requestId, const nsresult& aRv,
                   const PCacheResponse& response) MOZ_OVERRIDE;
   virtual bool
-  RecvAddAllResponse(const RequestId& requestId,
+  RecvAddAllResponse(const RequestId& requestId, const nsresult& aRv,
                      const nsTArray<PCacheResponse>& responses) MOZ_OVERRIDE;
   virtual bool
-  RecvPutResponse(const RequestId& requestId,
+  RecvPutResponse(const RequestId& requestId, const nsresult& aRv,
                   const PCacheResponseOrVoid& response) MOZ_OVERRIDE;
   virtual bool
-  RecvDeleteResponse(const RequestId& requestId,
+  RecvDeleteResponse(const RequestId& requestId, const nsresult& aRv,
                      const bool& result) MOZ_OVERRIDE;
   virtual bool
-  RecvKeysResponse(const RequestId& requestId,
+  RecvKeysResponse(const RequestId& requestId, const nsresult& aRv,
                    const nsTArray<PCacheRequest>& requests) MOZ_OVERRIDE;
 };
 
