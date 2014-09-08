@@ -58,7 +58,7 @@ protected:
 
     bool exists;
     mResult = aQuotaDir->Exists(&exists);
-    if (NS_FAILED(mResult) || mAllowCreate) { return; }
+    if (NS_FAILED(mResult) || (!exists && !mAllowCreate)) { return; }
 
     if (!exists) {
       mResult = aQuotaDir->Create(nsIFile::DIRECTORY_TYPE, 0755);
@@ -73,7 +73,7 @@ protected:
     if (NS_FAILED(mResult)) { return; }
 
     mResult = dbFile->Exists(&exists);
-    if (NS_FAILED(mResult) || mAllowCreate) { return; }
+    if (NS_FAILED(mResult) || (!exists && !mAllowCreate)) { return; }
 
     // XXX: Jonas tells me nsIFileURL usage off-main-thread is dangerous,
     //      but this is what IDB does to access mozIStorageConnection so
@@ -317,7 +317,7 @@ public:
               const nsACString& aBaseDomain, RequestId aRequestId,
               const nsAString& aKey, const nsID& aCacheId,
               CacheStorageDBConnection* aCacheStorageDBConnection)
-    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, false, aRequestId, aKey,
+    : OpenRunnable(aNamespace, aOrigin, aBaseDomain, true, aRequestId, aKey,
                    aCacheStorageDBConnection)
     , mCacheId(aCacheId)
     , mSuccess(false)
