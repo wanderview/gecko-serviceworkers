@@ -8,6 +8,7 @@
 
 #include "jsapi.h"
 #include "mozilla/EventListenerManager.h"
+#include "mozilla/dom/Fetch.h"
 #include "mozilla/dom/FunctionBinding.h"
 #include "mozilla/dom/DedicatedWorkerGlobalScopeBinding.h"
 #include "mozilla/dom/ServiceWorkerGlobalScopeBinding.h"
@@ -318,7 +319,7 @@ WorkerGlobalScope::Fetch(const RequestOrScalarValueString& aInput,
                          const RequestInit& aInit,
                          ErrorResult& aRv)
 {
-  return nullptr;
+  return WorkerDOMFetch(this, aInput, aInit, aRv);
 }
 
 DedicatedWorkerGlobalScope::DedicatedWorkerGlobalScope(WorkerPrivate* aWorkerPrivate)

@@ -8,10 +8,10 @@
 
 #include "mozilla/dom/FetchBinding.h"
 
-#include "nsIDOMFile.h"
 #include "nsISupportsImpl.h"
 #include "nsWrapperCache.h"
 
+class nsIDOMBlob;
 class nsPIDOMWindow;
 
 namespace mozilla {

@@ -7,9 +7,9 @@
  * http://fetch.spec.whatwg.org/
  */
 
-[Constructor(optional FetchBodyInit body, optional ResponseInit init),
+[Constructor(optional BodyInit body, optional ResponseInit init),
  Exposed=(Window,Worker),
- Func="mozilla::dom::Response::PrefEnabled"]
+ Func="mozilla::dom::Headers::PrefEnabled"]
 interface Response {
   static Response redirect(ScalarValueString url, optional unsigned short status = 302);
 
@@ -19,8 +19,9 @@ interface Response {
   readonly attribute unsigned short status;
   readonly attribute ByteString statusText;
   readonly attribute Headers headers;
-  readonly attribute FetchBodyStream body;
 };
+
+Response implements Body;
 
 dictionary ResponseInit {
   unsigned short status = 200;

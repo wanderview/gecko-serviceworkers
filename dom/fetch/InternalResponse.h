@@ -8,6 +8,10 @@
 
 #include "nsISupportsImpl.h"
 
+#include "mozilla/dom/Headers.h"
+#include "mozilla/dom/ResponseBinding.h"
+#include "nsIDOMFile.h"
+
 namespace mozilla {
 namespace dom {
 
@@ -18,18 +22,34 @@ class InternalResponse MOZ_FINAL
   ~InternalResponse()
   { }
 
-  uint32_t mStatus;
+  ResponseType mType;
+  nsCString mTerminationReason;
+  nsCString mURL;
+  const uint32_t mStatus;
   const nsCString mStatusText;
+  nsRefPtr<Headers> mHeaders;
+  nsCOMPtr<nsIDOMBlob> mBody;
   nsCString mContentType;
-  nsAutoPtr<BlobSet> mBody;
   bool mError;
 
 public:
-  NS_INLINE_DECL_REFCOUNTING(InternalResponse)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(InternalResponse)
 
   InternalResponse(uint32_t aStatus, const nsACString& aStatusText)
-    : mStatus(aStatus), mStatusText(aStatusText), mError(false)
+    : mStatus(aStatus)
+    , mStatusText(aStatusText)
+    , mHeaders(new Headers(nullptr))
+    , mError(false)
   { }
+
+  // Does not copy the body over!
+  explicit InternalResponse(const InternalResponse& aOther)
+    : mStatus(aOther.mStatus)
+    , mStatusText(aOther.mStatusText)
+    , mError(aOther.mError)
+    // FIXME(nsm): Copy the rest of the stuff.
+  {
+  }
 
   static already_AddRefed<InternalResponse>
   NetworkError()
@@ -39,26 +59,51 @@ public:
     return response.forget();
   }
 
+  ResponseType
+  Type() const
+  {
+    return mType;
+  }
+
   bool
-  IsError()
+  IsError() const
   {
     return mError;
   }
 
+  nsCString&
+  GetUrl()
+  {
+    return mURL;
+  }
+
   uint32_t
-  GetStatus()
+  GetStatus() const
   {
     return mStatus;
   }
 
   const nsCString&
-  GetStatusText()
+  GetStatusText() const
   {
     return mStatusText;
   }
 
+  already_AddRefed<Headers>
+  Headers_() const
+  {
+    nsRefPtr<Headers> h = mHeaders;
+    return h.forget();
+  }
+
   already_AddRefed<nsIDOMBlob>
   GetBody();
+
+  void
+  SetBody(nsIDOMBlob* aBody)
+  {
+    mBody = aBody;
+  }
 };
 
 } // namespace dom

@@ -3356,6 +3356,9 @@ WorkerPrivateParent<Derived>::SetBaseURI(nsIURI* aBaseURI)
   }
 
   mLoadInfo.mBaseURI = aBaseURI;
+  if (NS_FAILED(mLoadInfo.mBaseURI->GetSpec(mBaseURL))) {
+    mBaseURL.Truncate();
+  }
 
   if (NS_FAILED(aBaseURI->GetSpec(mLocationInfo.mHref))) {
     mLocationInfo.mHref.Truncate();

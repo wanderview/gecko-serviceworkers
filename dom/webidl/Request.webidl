@@ -11,23 +11,24 @@ typedef (Request or ScalarValueString) RequestInfo;
 
 [Constructor(RequestInfo input, optional RequestInit init),
  Exposed=(Window,Worker),
- Func="mozilla::dom::Request::PrefEnabled"]
+ Func="mozilla::dom::Headers::PrefEnabled"]
 interface Request {
   readonly attribute ByteString method;
-  readonly attribute ScalarValueString url;
+  // FIXME: Bug 1025183 attribute ScalarValueString url;
+  readonly attribute DOMString url;
   readonly attribute Headers headers;
-
-  readonly attribute FetchBodyStream body;
 
   readonly attribute DOMString referrer;
   readonly attribute RequestMode mode;
   readonly attribute RequestCredentials credentials;
 };
 
+Request implements Body;
+
 dictionary RequestInit {
   ByteString method;
   HeadersInit headers;
-  FetchBodyInit body;
+  BodyInit body;
   RequestMode mode;
   RequestCredentials credentials;
 };

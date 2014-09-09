@@ -6,13 +6,14 @@
 #include "mozilla/dom/FetchDriver.h"
 
 #include "nsIDOMFile.h"
-#include "nsIDocument.h"
 
 #include "nsContentPolicyUtils.h"
+#include "nsDOMBlobBuilder.h"
 #include "nsNetUtil.h"
 
 #include "mozilla/dom/workers/Workers.h"
 
+#include "Fetch.h"
 #include "InternalRequest.h"
 #include "InternalResponse.h"
 
@@ -22,7 +23,7 @@ namespace dom {
 already_AddRefed<nsIDOMBlob>
 InternalResponse::GetBody()
 {
-  nsRefPtr<nsIDOMBlob> b = mBody->GetBlobInternal(mContentType);
+  nsCOMPtr<nsIDOMBlob> b = mBody;
   return b.forget();
 }
 
@@ -30,6 +31,7 @@ NS_IMPL_ISUPPORTS(FetchDriver, nsIStreamListener)
 
 FetchDriver::FetchDriver(InternalRequest* aRequest)
   : mRequest(aRequest)
+  , mResponseBody(new BlobSet())
   , mFetchRecursionCount(0)
 {
 }
@@ -53,16 +55,6 @@ FetchDriver::Fetch(bool aCORSFlag)
   mFetchRecursionCount++;
 
   // FIXME(nsm): Deal with HSTS.
-
-  if (!mRequest->ReferrerIsNone()) {
-    nsCOMPtr<nsIDocument> doc = mRequest->GetClient();
-    MOZ_ASSERT(doc);
-
-    nsString referrer;
-    doc->GetReferrer(referrer);
-
-    mRequest->SetReferrer(NS_ConvertUTF16toUTF8(referrer));
-  }
 
   if (!mRequest->IsSynchronous() && mFetchRecursionCount <= 1) {
     nsCOMPtr<nsIRunnable> r =
@@ -303,9 +295,8 @@ FetchDriver::StreamReaderFunc(nsIInputStream* aInputStream,
                               uint32_t* aWriteCount)
 {
   FetchDriver* driver = static_cast<FetchDriver*>(aClosure);
-  InternalResponse* response = driver->mResponse;
 
-  nsresult rv = response->mBody->AppendVoidPtr(aFragment, aCount);
+  nsresult rv = driver->mResponseBody->AppendVoidPtr(aFragment, aCount);
   if (NS_SUCCEEDED(rv)) {
     *aWriteCount = aCount;
   }
@@ -322,9 +313,6 @@ FetchDriver::OnDataAvailable(nsIRequest* aRequest,
 {
   uint32_t aRead;
   MOZ_ASSERT(mResponse);
-  if (!mResponse->mBody) {
-    mResponse->mBody = new BlobSet();
-  }
 
   nsresult rv = aInputStream->ReadSegments(FetchDriver::StreamReaderFunc,
                                            static_cast<void*>(this),
@@ -339,7 +327,11 @@ FetchDriver::OnStopRequest(nsIRequest* aRequest,
 {
   nsCOMPtr<nsIChannel> chan = do_QueryInterface(aRequest);
   MOZ_ASSERT(chan);
-  chan->GetContentType(mResponse->mContentType);
+  nsCString contentType;
+  chan->GetContentType(contentType);
+
+  nsCOMPtr<nsIDOMBlob> blob = mResponseBody->GetBlobInternal(contentType);
+  mResponse->SetBody(blob);
 
   ContinueHttpFetchAfterNetworkFetch();
   return NS_OK;

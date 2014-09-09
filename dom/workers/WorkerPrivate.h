@@ -22,7 +22,7 @@
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsThreadUtils.h"
-#include "StructuredCloneTags.h"
+#include "mozilla/dom/StructuredCloneTags.h"
 
 #include "Queue.h"
 #include "WorkerFeature.h"
@@ -215,6 +215,7 @@ protected:
 private:
   WorkerPrivate* mParent;
   nsString mScriptURL;
+  nsCString mBaseURL;
   nsCString mSharedWorkerName;
   LocationInfo mLocationInfo;
   // The lifetime of these objects within LoadInfo is managed explicitly;
@@ -489,6 +490,12 @@ public:
   ScriptURL() const
   {
     return mScriptURL;
+  }
+
+  const nsCString&
+  BaseURL() const
+  {
+    return mBaseURL;
   }
 
   const nsCString&

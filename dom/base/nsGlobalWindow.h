@@ -850,6 +850,7 @@ protected:
 public:
   void Alert(mozilla::ErrorResult& aError);
   void Alert(const nsAString& aMessage, mozilla::ErrorResult& aError);
+  already_AddRefed<mozilla::dom::CacheStorage> Caches();
   bool Confirm(const nsAString& aMessage, mozilla::ErrorResult& aError);
   already_AddRefed<mozilla::dom::Promise> Fetch(const mozilla::dom::RequestOrScalarValueString& aInput,
                                                 const mozilla::dom::RequestInit& aInit,
@@ -1038,8 +1039,6 @@ public:
   void GetInterface(JSContext* aCx, nsIJSID* aIID,
                     JS::MutableHandle<JS::Value> aRetval,
                     mozilla::ErrorResult& aError);
-
-  already_AddRefed<mozilla::dom::CacheStorage> Caches();
 
 protected:
   // Array of idle observers that are notified of idle events.
@@ -1530,6 +1529,7 @@ protected:
   nsString                      mDefaultStatus;
   nsGlobalWindowObserver*       mObserver; // Inner windows only.
   nsCOMPtr<nsIDOMCrypto>        mCrypto;
+  nsRefPtr<mozilla::dom::CacheStorage> mCacheStorage;
   nsRefPtr<mozilla::dom::Console> mConsole;
   // We need to store an nsISupports pointer to this object because the
   // mozilla::dom::External class doesn't exist on b2g and using the type
@@ -1621,8 +1621,6 @@ protected:
   // mSpeechSynthesis is only used on inner windows.
   nsRefPtr<mozilla::dom::SpeechSynthesis> mSpeechSynthesis;
 #endif
-
-  nsRefPtr<mozilla::dom::CacheStorage> mCacheStorage;
 
   friend class nsDOMScriptableHelper;
   friend class nsDOMWindowUtils;

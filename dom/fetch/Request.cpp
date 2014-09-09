@@ -4,19 +4,18 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Request.h"
-#include "nsDOMString.h"
-#include "nsPIDOMWindow.h"
+
 #include "nsIURI.h"
 #include "nsISupportsImpl.h"
 
+#include "mozilla/dom/Promise.h"
 #include "nsDOMString.h"
 #include "nsPIDOMWindow.h"
+#include "WorkerPrivate.h"
 
-#include "mozilla/dom/FetchBodyStream.h"
-#include "mozilla/dom/Headers.h"
+// #include "mozilla/dom/FetchBodyStream.h"
 #include "mozilla/dom/URL.h"
-#include "mozilla/Preferences.h"
-#include "mozilla/dom/WorkerPrivate.h"
+#include "mozilla/dom/workers/bindings/URL.h"
 
 namespace mozilla {
 namespace dom {
@@ -30,30 +29,10 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Request)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-
-// static
-bool
-Request::PrefEnabled(JSContext* aCx, JSObject* aObj)
-{
-  using mozilla::dom::workers::WorkerPrivate;
-  using mozilla::dom::workers::GetWorkerPrivateFromContext;
-
-  if (NS_IsMainThread()) {
-    return Preferences::GetBool("dom.fetch.enabled");
-  }
-
-  WorkerPrivate* workerPrivate = GetWorkerPrivateFromContext(aCx);
-  if (!workerPrivate) {
-    return false;
-  }
-
-  return workerPrivate->DOMFetchEnabled();
-}
-
 Request::Request(nsISupports* aOwner, InternalRequest* aRequest)
   : mOwner(aOwner)
-  , mRequest(aRequest)
   , mHeaders(new Headers(aOwner))
+  , mRequest(aRequest)
 {
   SetIsDOMBinding();
 }
@@ -63,22 +42,16 @@ Request::~Request()
 }
 
 void
-Request::GetHeader(const nsAString& header, DOMString& value) const
+Request::GetHeader(const nsAString& aHeader, DOMString& aValue) const
 {
-  MOZ_CRASH("NOT IMPLEMENTED!");
+  aValue.AsAString() = EmptyString();
 }
 
 already_AddRefed<Headers>
-Request::HeadersValue() const
+Request::Headers_() const
 {
   nsRefPtr<Headers> ref = mHeaders;
   return ref.forget();
-}
-
-already_AddRefed<FetchBodyStream>
-Request::Body() const
-{
-  MOZ_CRASH("NOT IMPLEMENTED!");
 }
 
 already_AddRefed<InternalRequest>
@@ -89,46 +62,62 @@ Request::GetInternalRequest()
 }
 
 /*static*/ already_AddRefed<Request>
-Request::Constructor(const GlobalObject& global, const RequestOrScalarValueString& aInput,
+Request::Constructor(const GlobalObject& aGlobal, const RequestOrScalarValueString& aInput,
                      const RequestInit& aInit, ErrorResult& aRv)
 {
   nsRefPtr<InternalRequest> request;
+  
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
 
   if (aInput.IsRequest()) {
     request = aInput.GetAsRequest().GetInternalRequest();
   } else {
-    nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(global.GetAsSupports());
-    MOZ_ASSERT(window);
-    MOZ_ASSERT(window->GetExtantDoc());
-    request = new InternalRequest(window->GetExtantDoc());
+    request = new InternalRequest(global);
   }
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(global.GetAsSupports());
-  MOZ_ASSERT(window);
-  MOZ_ASSERT(window->GetExtantDoc());
-  request = request->GetRestrictedCopy(window->GetExtantDoc());
+  request = request->GetRestrictedCopy(global);
 
+  RequestMode fallbackMode = RequestMode::EndGuard_;
+  RequestCredentials fallbackCredentials = RequestCredentials::EndGuard_;
   if (aInput.IsScalarValueString()) {
     nsString input;
     input.Assign(aInput.GetAsScalarValueString());
-    // FIXME(nsm): Add worker support.
-    workers::AssertIsOnMainThread();
-    nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(global.GetAsSupports());
-    MOZ_ASSERT(window);
-
-    nsCOMPtr<nsIURI> docURI = window->GetDocumentURI();
-    nsCString spec;
-    docURI->GetSpec(spec);
-    nsRefPtr<URL> url = URL::Constructor(global, input, NS_ConvertUTF8toUTF16(spec), aRv);
-    if (aRv.Failed()) {
-      return nullptr;
-    }
+    
     nsString sURL;
-    url->Stringify(sURL, aRv);
-    if (aRv.Failed()) {
-      return nullptr;
+    if (NS_IsMainThread()) {
+      nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(global);
+      MOZ_ASSERT(window);
+      nsCOMPtr<nsIURI> docURI = window->GetDocumentURI();
+      nsCString spec;
+      docURI->GetSpec(spec);
+      nsRefPtr<mozilla::dom::URL> url = mozilla::dom::URL::Constructor(aGlobal, input, NS_ConvertUTF8toUTF16(spec), aRv);
+      if (aRv.Failed()) {
+        aRv.ThrowTypeError(MSG_URL_PARSE_ERROR);
+        return nullptr;
+      }
+
+      url->Stringify(sURL, aRv);
+      if (aRv.Failed()) {
+        aRv.ThrowTypeError(MSG_URL_PARSE_ERROR);
+        return nullptr;
+      }
+    } else {
+      workers::WorkerPrivate* worker = workers::GetCurrentThreadWorkerPrivate();
+      MOZ_ASSERT(worker);
+      worker->AssertIsOnWorkerThread();
+      nsRefPtr<workers::URL> url = mozilla::dom::workers::URL::Constructor(aGlobal, input, NS_ConvertUTF8toUTF16(worker->BaseURL()), aRv);
+      if (aRv.Failed()) {
+        return nullptr;
+      }
+
+      url->Stringify(sURL, aRv);
+      if (aRv.Failed()) {
+        return nullptr;
+      }
     }
     request->SetURL(NS_ConvertUTF16toUTF8(sURL));
+    fallbackMode = RequestMode::Cors;
+    fallbackCredentials = RequestCredentials::Omit;
   }
 
   nsCString method = aInit.mMethod.WasPassed() ? aInit.mMethod.Value() : NS_LITERAL_CSTRING("GET");
@@ -142,16 +131,105 @@ Request::Constructor(const GlobalObject& global, const RequestOrScalarValueStrin
 
   request->SetMethod(method);
 
-  nsRefPtr<Request> domRequest =
-    new Request(global.GetAsSupports(), request);
+  nsRefPtr<Request> domRequest = new Request(global, request);
 
   // FIXME(nsm): Plenty of headers and body property setting here.
 
   // FIXME(nsm): Headers
   // FIXME(nsm): Body setup from FetchBodyStreamInit.
-  request->SetMode(aInit.mMode.WasPassed() ? aInit.mMode.Value() : RequestMode::Same_origin);
-  request->SetCredentialsMode(aInit.mCredentials.WasPassed() ? aInit.mCredentials.Value() : RequestCredentials::Omit);
+  RequestMode mode = aInit.mMode.WasPassed() ? aInit.mMode.Value() : fallbackMode;
+  RequestCredentials credentials = aInit.mCredentials.WasPassed() ? aInit.mCredentials.Value() : fallbackCredentials;
+
+  if (mode != RequestMode::EndGuard_) {
+    request->SetMode(mode);
+  }
+
+  if (credentials != RequestCredentials::EndGuard_) {
+    request->SetCredentialsMode(credentials);
+  }
+
   return domRequest.forget();
+}
+
+already_AddRefed<Promise>
+Request::ArrayBuffer()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+already_AddRefed<Promise>
+Request::Blob()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+already_AddRefed<Promise>
+Request::FormData()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+already_AddRefed<Promise>
+Request::Json()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+already_AddRefed<Promise>
+Request::Text()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+bool
+Request::BodyUsed()
+{
+  return false;
 }
 
 } // namespace dom

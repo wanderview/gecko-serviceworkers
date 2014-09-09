@@ -43,6 +43,7 @@ public:
 private:
   nsRefPtr<InternalRequest> mRequest;
   nsRefPtr<InternalResponse> mResponse;
+  nsAutoPtr<BlobSet> mResponseBody;
   nsRefPtr<FetchDriverObserver> mObserver;
   uint32_t mFetchRecursionCount;
 

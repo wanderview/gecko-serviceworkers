@@ -21,6 +21,28 @@ namespace dom {
 class InternalResponse;
 class Promise;
 class Response;
+class WorkerPromiseHolder;
+
+namespace workers {
+class WorkerPrivate;
+} // namespace workers
+
+class WorkerResolveFetchWithResponse MOZ_FINAL : public FetchDriverObserver
+{
+  nsRefPtr<WorkerPromiseHolder> mPromiseHolder;
+  nsRefPtr<InternalResponse> mInternalResponse;
+public:
+  WorkerResolveFetchWithResponse(WorkerPromiseHolder* aHolder);
+
+  void
+  OnResponseAvailable(InternalResponse* aResponse) MOZ_OVERRIDE;
+
+  void
+  OnResponseEnd() MOZ_OVERRIDE;
+
+private:
+  ~WorkerResolveFetchWithResponse();
+};
 
 class ResolveFetchWithResponse MOZ_FINAL : public FetchDriverObserver
 {
@@ -42,12 +64,18 @@ private:
   ~ResolveFetchWithResponse();
 };
 
+already_AddRefed<Promise>
+WorkerDOMFetch(nsIGlobalObject* aGlobal, const RequestOrScalarValueString& aInput,
+               const RequestInit& aInit, ErrorResult& aRv);
+
 // Utility since windows and workers implement the same fetch() initialization
 // logic.
 already_AddRefed<Promise>
 DOMFetch(nsIGlobalObject* aGlobal, const RequestOrScalarValueString& aInput,
          const RequestInit& aInit, ErrorResult& aRv);
 
+nsCString
+GetRequestReferrer(const InternalRequest* aRequest);
 
 } // namespace dom
 } // namespace mozilla

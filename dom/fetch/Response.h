@@ -6,11 +6,11 @@
 #ifndef mozilla_dom_Response_h
 #define mozilla_dom_Response_h
 
-#include "mozilla/dom/FetchBodyStream.h"
 #include "mozilla/dom/ResponseBinding.h"
 #include "mozilla/dom/UnionTypes.h"
 #include "ipc/IPCMessageUtils.h"
 
+#include "InternalResponse.h"
 #include "nsWrapperCache.h"
 #include "nsISupportsImpl.h"
 
@@ -36,37 +36,32 @@ class Response MOZ_FINAL : public nsISupports
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(Response)
 
 public:
-  static bool PrefEnabled(JSContext* cx, JSObject* obj);
-
   Response(nsISupports* aOwner);
+
+  Response(nsIGlobalObject* aGlobal, InternalResponse* aInternalResponse);
 
   ResponseType
   Type() const
   {
-    return mType;
+    return mInternalResponse->Type();
   }
 
   void
   GetUrl(DOMString& aUrl) const
   {
-    aUrl.AsAString() = mUrl;
+    aUrl.AsAString() = NS_ConvertUTF8toUTF16(mInternalResponse->GetUrl());
   }
-
-// Undo xlib #define brain-damage
-#ifdef Status
-#undef Status
-#endif
 
   uint16_t
   Status() const
   {
-    return mStatus;
+    return mInternalResponse->GetStatus();
   }
 
   void
   GetStatusText(nsCString& aStatusText) const
   {
-    aStatusText = mStatusText;
+    aStatusText = mInternalResponse->GetStatusText();
   }
 
   already_AddRefed<Headers>
@@ -75,12 +70,9 @@ public:
   static already_AddRefed<Response>
   Redirect(const GlobalObject& aGlobal, const nsAString& aUrl, uint16_t aStatus);
 
-  already_AddRefed<FetchBodyStream>
-  Body() const;
-
   static already_AddRefed<Response>
   Constructor(const GlobalObject& aGlobal,
-              const Optional<ArrayBufferOrArrayBufferViewOrBlobOrString>& aBody,
+              const Optional<ArrayBufferOrArrayBufferViewOrBlobOrFormDataOrScalarValueStringOrURLSearchParams>& aBody,
               const ResponseInit& aInit, ErrorResult& rv);
 
   virtual JSObject*
@@ -94,24 +86,29 @@ public:
     return mOwner;
   }
 
-  void
-  SetBody(nsIDOMBlob* aBlob)
-  {
-    mBody = new FetchBodyStream(mOwner);
-    mBody->SetBlob(aBlob);
-  }
+  already_AddRefed<Promise>
+  ArrayBuffer();
 
+  already_AddRefed<Promise>
+  Blob();
+
+  already_AddRefed<Promise>
+  FormData();
+
+  already_AddRefed<Promise>
+  Json();
+
+  already_AddRefed<Promise>
+  Text();
+
+  bool
+  BodyUsed();
 private:
   ~Response();
 
   nsISupports* mOwner;
-
-  ResponseType mType;
-  nsString mUrl;
-  uint16_t mStatus;
-  nsCString mStatusText;
-  nsRefPtr<Headers> mHeaders;
-  nsRefPtr<FetchBodyStream> mBody;
+  nsRefPtr<InternalResponse> mInternalResponse;
+  // nsRefPtr<FetchBodyStream> mBody;
 };
 
 } // namespace dom

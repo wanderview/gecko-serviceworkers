@@ -189,7 +189,6 @@
 #include "mozilla/dom/indexedDB/IDBFactory.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/quota/QuotaManager.h"
-#include "mozilla/dom/FetchDriver.h"
 #include "mozilla/dom/Request.h"
 #include "mozilla/dom/Response.h"
 

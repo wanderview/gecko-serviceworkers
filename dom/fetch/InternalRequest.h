@@ -10,7 +10,6 @@
 #include "mozilla/dom/UnionTypes.h"
 
 #include "nsIContentPolicy.h"
-#include "nsIDocument.h"
 #include "nsISupportsImpl.h"
 
 class nsIDocument;
@@ -27,7 +26,7 @@ class InternalRequest MOZ_FINAL
   friend class Request;
 
 public:
-  NS_INLINE_DECL_REFCOUNTING(InternalRequest)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(InternalRequest)
 
   enum ContextFrameType
   {
@@ -37,7 +36,15 @@ public:
     NONE,
   };
 
-  explicit InternalRequest(nsIDocument* aClient)
+  // Since referrer type can be none, client or a URL.
+  enum ReferrerType
+  {
+    REFERRER_NONE = 0,
+    REFERRER_CLIENT,
+    REFERRER_URL,
+  };
+
+  explicit InternalRequest(nsIGlobalObject* aClient)
     : mMethod("GET")
     //, mUnsafeRequest(false)
     , mPreserveContentCodings(false)
@@ -58,10 +65,10 @@ public:
   {
   }
 
-  // FIXME(nsm): Copy constructor.
+  explicit InternalRequest(const InternalRequest& aRequest);
 
   void
-  GetMethod(nsCString& aMethod)
+  GetMethod(nsCString& aMethod) const
   {
     aMethod.Assign(mMethod);
   }
@@ -73,7 +80,7 @@ public:
   }
 
   void
-  GetURL(nsCString& aURL)
+  GetURL(nsCString& aURL) const
   {
     aURL.Assign(mURL);
   }
@@ -85,16 +92,35 @@ public:
     mURL.Assign(aURL);
   }
 
-  nsIDocument*
-  GetClient()
+  nsIGlobalObject*
+  GetClient() const
   {
     return mClient;
   }
 
   bool
-  ReferrerIsNone()
+  ReferrerIsNone() const
   {
     return mReferrerType == REFERRER_NONE;
+  }
+
+  bool
+  ReferrerIsURL() const
+  {
+    return mReferrerType == REFERRER_URL;
+  }
+
+  bool
+  ReferrerIsClient() const
+  {
+    return mReferrerType == REFERRER_CLIENT;
+  }
+
+  nsCString
+  ReferrerAsURL() const
+  {
+    MOZ_ASSERT(ReferrerIsURL());
+    return mReferrerURL;
   }
 
   void
@@ -107,14 +133,14 @@ public:
   }
 
   void
-  SetReferrer(nsIDocument* aClient)
+  SetReferrer(nsIGlobalObject* aClient)
   {
     mReferrerType = REFERRER_CLIENT;
     mReferrerClient = aClient;
   }
 
   bool
-  IsSynchronous()
+  IsSynchronous() const
   {
     return mSynchronous;
   }
@@ -132,14 +158,14 @@ public:
   }
 
   nsContentPolicyType
-  GetContext()
+  GetContext() const
   {
     return mContext;
   }
 
   // The global is used as the client for the new object.
   already_AddRefed<InternalRequest>
-  GetRestrictedCopy(nsIDocument* aGlobal);
+  GetRestrictedCopy(nsIGlobalObject* aGlobal) const;
 
 private:
   ~InternalRequest();
@@ -153,8 +179,8 @@ private:
 
   bool mPreserveContentCodings;
 
-  // FIXME(nsm): This could be non-document stuff. What do we do then?
-  nsIDocument* mClient;
+  // FIXME(nsm): Strong ref?
+  nsIGlobalObject* mClient;
 
   bool mSkipServiceWorker;
   nsContentPolicyType mContext;
@@ -167,14 +193,9 @@ private:
   //bool mForceOriginHeader;
   //bool mSameOriginDataURL;
 
-  // Since referrer type can be none, client or a URL.
-  enum {
-    REFERRER_NONE = 0,
-    REFERRER_CLIENT,
-    REFERRER_URL,
-  } mReferrerType;
+  ReferrerType mReferrerType;
   nsCString mReferrerURL;
-  nsCOMPtr<nsIDocument> mReferrerClient;
+  nsCOMPtr<nsIGlobalObject> mReferrerClient;
 
   //bool mAuthenticationFlag;
   bool mSynchronous;

@@ -78,7 +78,7 @@ ToPCacheRequest(PCacheRequest& aOut, const Request& aIn)
     // TODO: Should we error out here instead?
     aIn.GetUrl(aOut.urlWithoutQuery());
   }
-  nsRefPtr<Headers> headers = aIn.HeadersValue();
+  nsRefPtr<Headers> headers = aIn.Headers_();
   MOZ_ASSERT(headers);
   aOut.headers() = headers->AsPHeaders();
   aOut.mode() = aIn.Mode();

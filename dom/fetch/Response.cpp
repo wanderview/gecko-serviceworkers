@@ -4,13 +4,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Response.h"
-#include "nsDOMString.h"
-#include "nsPIDOMWindow.h"
-#include "nsIURI.h"
-#include "nsISupportsImpl.h"
 
-#include "mozilla/Preferences.h"
-#include "mozilla/dom/WorkerPrivate.h"
+#include "nsISupportsImpl.h"
+#include "nsIURI.h"
+#include "nsPIDOMWindow.h"
+
+#include "InternalResponse.h"
+#include "nsDOMString.h"
+
+#include "File.h" // workers/File.h
 
 using namespace mozilla::dom;
 
@@ -23,31 +25,19 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Response)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-// static
-bool
-Response::PrefEnabled(JSContext* aCx, JSObject* aObj)
-{
-  using mozilla::dom::workers::WorkerPrivate;
-  using mozilla::dom::workers::GetWorkerPrivateFromContext;
-
-  if (NS_IsMainThread()) {
-    return Preferences::GetBool("dom.fetch.enabled");
-  }
-
-  WorkerPrivate* workerPrivate = GetWorkerPrivateFromContext(aCx);
-  if (!workerPrivate) {
-    return false;
-  }
-
-  return workerPrivate->DOMFetchEnabled();
-}
-
 Response::Response(nsISupports* aOwner)
   : mOwner(aOwner)
-  , mType(ResponseType::Default)
-  , mHeaders(new Headers(aOwner))
 {
   SetIsDOMBinding();
+}
+
+Response::Response(nsIGlobalObject* aGlobal, InternalResponse* aInternalResponse)
+  : mOwner(aGlobal)
+  , mInternalResponse(aInternalResponse)
+{
+  SetIsDOMBinding();
+  // nsCOMPtr<nsIDOMBlob> body = aInternalResponse->GetBody();
+  // SetBody(body);
 }
 
 Response::~Response()
@@ -57,33 +47,119 @@ Response::~Response()
 already_AddRefed<Headers>
 Response::Headers_() const
 {
-  nsRefPtr<Headers> ref = mHeaders;
-  return ref.forget();
+  return mInternalResponse->Headers_();
 }
 
 /* static */ already_AddRefed<Response>
 Response::Redirect(const GlobalObject& aGlobal, const nsAString& aUrl,
                    uint16_t aStatus)
 {
-  MOZ_CRASH("NOT IMPLEMENTED!");
-}
-
-already_AddRefed<FetchBodyStream>
-Response::Body() const
-{
-  MOZ_ASSERT(mBody);
-  nsRefPtr<FetchBodyStream> body = mBody;
-  return body.forget();
+  return nullptr;
 }
 
 /*static*/ already_AddRefed<Response>
 Response::Constructor(const GlobalObject& global,
-                      const Optional<ArrayBufferOrArrayBufferViewOrBlobOrString>& aBody,
+                      const Optional<ArrayBufferOrArrayBufferViewOrBlobOrFormDataOrScalarValueStringOrURLSearchParams>& aBody,
                       const ResponseInit& aInit, ErrorResult& rv)
 {
   nsRefPtr<Response> response = new Response(global.GetAsSupports());
-  response->mStatus = aInit.mStatus;
-  response->mStatusText = aInit.mStatusText.WasPassed() ? aInit.mStatusText.Value() : NS_LITERAL_CSTRING("OK");
-  // FIXME(nsm): Headers and body.
   return response.forget();
+}
+
+already_AddRefed<Promise>
+Response::ArrayBuffer()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+already_AddRefed<Promise>
+Response::Blob()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIDOMBlob> blob = mInternalResponse->GetBody();
+  // FIXME(nsm): Not ready to be async yet.
+  MOZ_ASSERT(blob);
+  ThreadsafeAutoJSContext cx;
+  JS::Rooted<JS::Value> val(cx);
+  nsresult rv;
+  if (NS_IsMainThread()) {
+    rv = nsContentUtils::WrapNative(cx, blob, &val);
+  } else {
+    val.setObject(*file::CreateBlob(cx, blob));
+    rv = NS_OK;
+  }
+
+  if (NS_FAILED(rv)) {
+    promise->MaybeReject(rv);
+  } else {
+    promise->MaybeResolve(cx, val);
+  }
+  return promise.forget();
+}
+
+already_AddRefed<Promise>
+Response::FormData()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+already_AddRefed<Promise>
+Response::Json()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+already_AddRefed<Promise>
+Response::Text()
+{
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetParentObject());
+  MOZ_ASSERT(global);
+  ErrorResult result;
+  nsRefPtr<Promise> promise = Promise::Create(global, result);
+  if (result.Failed()) {
+    return nullptr;
+  }
+
+  promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
+  return promise.forget();
+}
+
+bool
+Response::BodyUsed()
+{
+  return false;
 }

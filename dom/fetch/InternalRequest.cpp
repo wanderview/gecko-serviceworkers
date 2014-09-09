@@ -13,10 +13,27 @@
 namespace mozilla {
 namespace dom {
 
-already_AddRefed<InternalRequest>
-InternalRequest::GetRestrictedCopy(nsIDocument* aGlobal)
+InternalRequest::InternalRequest(const InternalRequest& aRequest)
+  : mMethod(aRequest.mMethod),
+    mURL(aRequest.mURL),
+    mPreserveContentCodings(aRequest.mPreserveContentCodings),
+    mClient(aRequest.mClient),
+    mSkipServiceWorker(aRequest.mSkipServiceWorker),
+    mContext(aRequest.mContext),
+    mOrigin(aRequest.mOrigin),
+    mReferrerType(aRequest.mReferrerType),
+    mReferrerURL(aRequest.mReferrerURL),
+    //mReferrerClient(aRequest.mReferrerClient),
+    mSynchronous(aRequest.mSynchronous),
+    mMode(aRequest.mMode),
+    mCredentialsMode(aRequest.mCredentialsMode)
 {
-  workers::AssertIsOnMainThread(); // Required?
+  MOZ_ASSERT(ReferrerIsNone() || ReferrerIsURL());
+}
+
+already_AddRefed<InternalRequest>
+InternalRequest::GetRestrictedCopy(nsIGlobalObject* aGlobal) const
+{
   nsRefPtr<InternalRequest> copy = new InternalRequest(aGlobal);
   copy->mURL.Assign(mURL);
   copy->SetMethod(mMethod);
@@ -24,12 +41,17 @@ InternalRequest::GetRestrictedCopy(nsIDocument* aGlobal)
   // FIXME(nsm): Tee body.
   copy->mPreserveContentCodings = true;
   
-  nsIURI* uri = aGlobal->GetDocumentURI();
-  if (!uri) {
-    return nullptr;
-  }
+  if (NS_IsMainThread()) {
+    nsIPrincipal* principal = aGlobal->PrincipalOrNull();
+    MOZ_ASSERT(principal);
+    nsContentUtils::GetASCIIOrigin(principal, copy->mOrigin);
+  } else {
+    workers::WorkerPrivate* worker = workers::GetCurrentThreadWorkerPrivate();
+    MOZ_ASSERT(worker);
+    worker->AssertIsOnWorkerThread();
 
-  nsContentUtils::GetASCIIOrigin(uri, copy->mOrigin);
+    // FIXME(nsm): Set origin.
+  }
 
   copy->SetReferrer(mClient);
   // FIXME(nsm): Set context;
